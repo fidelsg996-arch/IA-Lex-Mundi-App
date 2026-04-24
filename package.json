@@ -1,0 +1,33 @@
+{
+  "name": "ia-lex-mundi",
+  "version": "1.0.0",
+  "description": "International Law",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fidelsg996-arch/IA-Lex-Mundi.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/fidelsg996-arch/IA-Lex-Mundi/issues"
+  },
+  "homepage": "https://github.com/fidelsg996-arch/IA-Lex-Mundi#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.0",
+    "express": "^5.2.1",
+    "fs-extra": "^11.3.4",
+    "openai": "^6.33.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^3.4.4"
+  }
+}

@@ -1,0 +1,26 @@
+const geminiService = require('./geminiService');
+
+const analyzeLegalDocument = async (text, analysisType, modelType = 'mini') => {
+    return await geminiService.analyzeLegalDocument(text, analysisType);
+};
+
+const generateQuizFromText = async (text, numberOfQuestions = 10, difficulty = 'Medium') => {
+    return await geminiService.generateQuizFromText(text, numberOfQuestions, difficulty);
+};
+
+const generateSummary = async (text) => {
+    return await geminiService.analyzeLegalDocument(text, 'General');
+};
+
+const MODELS = {
+    nano: 'gemini-pro',
+    mini: 'gemini-pro',
+    pro: 'gemini-pro'
+};
+
+module.exports = {
+    analyzeLegalDocument,
+    generateQuizFromText,
+    generateSummary,
+    MODELS,
+};
