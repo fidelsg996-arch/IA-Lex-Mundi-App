@@ -1,8 +1,9 @@
-// src/pages/AgendaLaboral.js
+// src/pages/AgendaLaboral.jsx
 import { useState, useEffect } from 'react';
+import { usePersistencia } from '../hooks/usePersistencia';
 
 // ------------------------------------------------------------
-// CONFIGURACIÓN DE CALENDARIOS JUDICIALES (misma que antes)
+// CONFIGURACIÓN DE CALENDARIOS JUDICIALES
 // ------------------------------------------------------------
 const calendariosJudiciales = {
   'Oaxaca': {
@@ -92,7 +93,6 @@ const estadosDisponibles = [
 
 const añosDisponibles = [2025, 2026, 2027, 2028];
 
-// Materias / Tipos de proceso judicial
 const materiasJudiciales = [
   'Constitución y Garantías (Amparo, Controversias, Inconstitucionalidad)',
   'Penal',
@@ -116,7 +116,10 @@ const AgendaLaboral = () => {
     const hoy = new Date();
     return `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
   });
-  const [eventosPersonales, setEventosPersonales] = useState([]);
+  
+  // Usar persistencia para eventos personales
+  const { datos: eventosPersonales, guardarDatos, cargando } = usePersistencia('agenda_personal', []);
+  const [eventosLocal, setEventosLocal] = useState([]);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoEvento, setEditandoEvento] = useState(null);
   const [formData, setFormData] = useState({
@@ -129,24 +132,19 @@ const AgendaLaboral = () => {
     expediente: ''
   });
 
-  // Cargar eventos personales desde localStorage
+  // Sincronizar eventos con Firestore
   useEffect(() => {
-    const stored = localStorage.getItem('lexmindi_agenda_personal');
-    if (stored) {
-      setEventosPersonales(JSON.parse(stored));
-    } else {
+    if (eventosPersonales && eventosPersonales.length > 0) {
+      setEventosLocal(eventosPersonales);
+    } else if (!cargando && (!eventosPersonales || eventosPersonales.length === 0)) {
       const hoy = new Date().toISOString().split('T')[0];
       const ejemplos = [
         { id: 1, titulo: 'Audiencia de conciliación', tipo: 'audiencia', materia: 'Laboral', fecha: hoy, hora: '10:00', descripcion: 'Juzgado laboral', expediente: '2025-001' }
       ];
-      setEventosPersonales(ejemplos);
-      localStorage.setItem('lexmindi_agenda_personal', JSON.stringify(ejemplos));
+      setEventosLocal(ejemplos);
+      guardarDatos(ejemplos);
     }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('lexmindi_agenda_personal', JSON.stringify(eventosPersonales));
-  }, [eventosPersonales]);
+  }, [eventosPersonales, cargando]);
 
   // Obtener calendario judicial
   const obtenerCalendarioJudicial = () => {
@@ -175,7 +173,7 @@ const AgendaLaboral = () => {
   };
 
   const getEventosPersonalesPorFecha = (fechaStr) => {
-    return eventosPersonales.filter(ev => ev.fecha === fechaStr);
+    return eventosLocal.filter(ev => ev.fecha === fechaStr);
   };
 
   // Navegación
@@ -288,7 +286,7 @@ const AgendaLaboral = () => {
     });
   };
 
-  // CRUD eventos personales
+  // CRUD eventos personales con persistencia en Firebase
   const abrirModalNuevo = (fecha = null) => {
     setEditandoEvento(null);
     setFormData({
@@ -317,22 +315,27 @@ const AgendaLaboral = () => {
     setModalAbierto(true);
   };
 
-  const guardarEvento = () => {
+  const guardarEvento = async () => {
     if (!formData.titulo || !formData.fecha) {
       alert('Completa los campos obligatorios: título y fecha');
       return;
     }
+    let nuevosEventos;
     if (editandoEvento) {
-      setEventosPersonales(eventosPersonales.map(ev => ev.id === editandoEvento.id ? { ...formData, id: ev.id } : ev));
+      nuevosEventos = eventosLocal.map(ev => ev.id === editandoEvento.id ? { ...formData, id: ev.id } : ev);
     } else {
-      setEventosPersonales([...eventosPersonales, { ...formData, id: Date.now() }]);
+      nuevosEventos = [...eventosLocal, { ...formData, id: Date.now() }];
     }
+    setEventosLocal(nuevosEventos);
+    await guardarDatos(nuevosEventos);
     setModalAbierto(false);
   };
 
-  const eliminarEvento = (id) => {
+  const eliminarEvento = async (id) => {
     if (window.confirm('¿Eliminar este evento?')) {
-      setEventosPersonales(eventosPersonales.filter(ev => ev.id !== id));
+      const nuevosEventos = eventosLocal.filter(ev => ev.id !== id);
+      setEventosLocal(nuevosEventos);
+      await guardarDatos(nuevosEventos);
     }
   };
 
@@ -363,7 +366,6 @@ const AgendaLaboral = () => {
     setVista('dia');
   };
 
-  // Renderizado de vistas (mes, semana, día) igual que antes pero con materia en los eventos
   const renderVistaMes = () => {
     const semanas = obtenerDiasMes();
     const nombreMes = new Date(añoSeleccionado, mesSeleccionado, 1).toLocaleString('es-MX', { month: 'long' });
@@ -533,6 +535,8 @@ const AgendaLaboral = () => {
   };
 
   const fechaFormateada = new Date(fechaSeleccionada).toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  if (cargando) return <div className="text-center py-20">Cargando agenda...</div>;
 
   return (
     <div className="px-4">

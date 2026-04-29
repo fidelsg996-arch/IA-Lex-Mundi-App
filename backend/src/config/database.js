@@ -1,13 +1,14 @@
 const mongoose = require('mongoose');
 const logger = require('../utils/logger');
 
-// URI de MongoDB Atlas con credenciales actualizadas
-const MONGO_URI = "mongodb+srv://admin_user:FC7BrqOXXhw1zfs6@cluster0.qx6ez3t.mongodb.net/?appName=Cluster0";
+// URI DIRECTA (hardcodeada temporalmente)
+const MONGO_URI = "mongodb+srv://app_user:v2CMyxHZ47C491jM@cluster0.qx6ez3t.mongodb.net/ia-lex-mundi?retryWrites=true&w=majority&appName=Cluster0";
 
 const connectDB = async () => {
   try {
+    console.log('🔍 Conectando a MongoDB Atlas...');
+    
     await mongoose.connect(MONGO_URI, {
-      // Opciones para evitar warnings
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
     });
@@ -16,22 +17,8 @@ const connectDB = async () => {
   } catch (error) {
     logger.error('❌ Error de conexión a MongoDB:', error.message);
     console.error('❌ Error de conexión a MongoDB:', error.message);
-    // No salir del proceso para permitir reintentos
-    throw error;
+    process.exit(1);
   }
 };
-
-// Manejar eventos de conexión
-mongoose.connection.on('connected', () => {
-  console.log('🟢 Mongoose conectado a MongoDB Atlas');
-});
-
-mongoose.connection.on('error', (err) => {
-  console.error('🔴 Error en conexión Mongoose:', err.message);
-});
-
-mongoose.connection.on('disconnected', () => {
-  console.log('🟡 Mongoose desconectado de MongoDB Atlas');
-});
 
 module.exports = { connectDB };

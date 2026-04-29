@@ -1,5 +1,6 @@
-// src/pages/CalculadoraLaboral.js (versión final con borrado de historial)
+// src/pages/CalculadoraLaboral.jsx
 import { useState, useEffect } from 'react';
+import { usePersistencia } from '../hooks/usePersistencia';
 
 // Salarios mínimos 2026
 const SALARIOS_MINIMOS = {
@@ -83,11 +84,17 @@ const articulosLFT = {
 };
 
 const CalculadoraLaboral = () => {
-  const [datosCliente, setDatosCliente] = useState({
+  // Usar persistencia para datos del cliente
+  const { datos: clienteData, guardarDatos: guardarCliente, cargando: cargandoCliente } = usePersistencia('calculadora_cliente', {
     nombre: '',
     cedula: '',
     despacho: ''
   });
+  
+  // Usar persistencia para el historial de cálculos
+  const { datos: historialData, guardarDatos: guardarHistorial, cargando: cargandoHistorial } = usePersistencia('calculadora_historial', []);
+  
+  const [datosCliente, setDatosCliente] = useState({ nombre: '', cedula: '', despacho: '' });
   const [trabajador, setTrabajador] = useState({
     nombre: '',
     rfc: '',
@@ -101,19 +108,34 @@ const CalculadoraLaboral = () => {
   });
   const [salarioProfesionMostrado, setSalarioProfesionMostrado] = useState(null);
   const [resultados, setResultados] = useState(null);
-  const [historial, setHistorial] = useState([]);
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
+  const [historial, setHistorial] = useState([]);
 
-  // Cargar historial
+  // Sincronizar datos del cliente con Firestore
   useEffect(() => {
-    const stored = localStorage.getItem('calculadora_laboral_historial');
-    if (stored) setHistorial(JSON.parse(stored));
-  }, []);
+    if (clienteData && !cargandoCliente) {
+      setDatosCliente(clienteData);
+    }
+  }, [clienteData, cargandoCliente]);
 
-  const guardarEnHistorial = (calculo) => {
+  // Sincronizar historial con Firestore
+  useEffect(() => {
+    if (historialData && !cargandoHistorial) {
+      setHistorial(historialData);
+    }
+  }, [historialData, cargandoHistorial]);
+
+  // Guardar datos del cliente cuando cambien
+  useEffect(() => {
+    if (datosCliente.nombre || datosCliente.cedula || datosCliente.despacho) {
+      guardarCliente(datosCliente);
+    }
+  }, [datosCliente]);
+
+  const guardarEnHistorial = async (calculo) => {
     const nuevoHistorial = [calculo, ...historial].slice(0, 20);
     setHistorial(nuevoHistorial);
-    localStorage.setItem('calculadora_laboral_historial', JSON.stringify(nuevoHistorial));
+    await guardarHistorial(nuevoHistorial);
   };
 
   const getSalarioMinimo = () => {
@@ -178,7 +200,7 @@ const CalculadoraLaboral = () => {
     };
   };
 
-  const handleCalcular = () => {
+  const handleCalcular = async () => {
     let salarioDiario = trabajador.salarioDiario ? parseFloat(trabajador.salarioDiario) : null;
     if (!salarioDiario && trabajador.profesionId) {
       salarioDiario = getSalarioProfesion();
@@ -200,6 +222,7 @@ const CalculadoraLaboral = () => {
     const salarioIntegrado = calcularSalarioDiarioIntegrado(salarioDiario);
 
     const calculo = {
+      id: Date.now(),
       fecha: new Date().toISOString(),
       trabajador: { ...trabajador, salarioDiario },
       datosCliente,
@@ -215,7 +238,7 @@ const CalculadoraLaboral = () => {
       }
     };
     setResultados(calculo.resultados);
-    guardarEnHistorial(calculo);
+    await guardarEnHistorial(calculo);
   };
 
   const cargarDelHistorial = (item) => {
@@ -225,20 +248,19 @@ const CalculadoraLaboral = () => {
     setMostrarHistorial(false);
   };
 
-  // Funciones para eliminar historial
-  const eliminarDelHistorial = (index) => {
+  const eliminarDelHistorial = async (index) => {
     if (window.confirm('¿Eliminar este cálculo del historial?')) {
       const nuevoHistorial = [...historial];
       nuevoHistorial.splice(index, 1);
       setHistorial(nuevoHistorial);
-      localStorage.setItem('calculadora_laboral_historial', JSON.stringify(nuevoHistorial));
+      await guardarHistorial(nuevoHistorial);
     }
   };
 
-  const borrarHistorialCompleto = () => {
+  const borrarHistorialCompleto = async () => {
     if (window.confirm('¿Eliminar TODOS los cálculos del historial? Esta acción no se puede deshacer.')) {
       setHistorial([]);
-      localStorage.setItem('calculadora_laboral_historial', JSON.stringify([]));
+      await guardarHistorial([]);
     }
   };
 
@@ -326,6 +348,8 @@ const CalculadoraLaboral = () => {
     ventana.document.close();
     ventana.print();
   };
+
+  if (cargandoCliente || cargandoHistorial) return <div className="text-center py-20">Cargando calculadora...</div>;
 
   return (
     <div className="px-4">
@@ -432,7 +456,7 @@ const CalculadoraLaboral = () => {
             {historial.length === 0 && <p className="text-gray-500 text-center py-4">Sin historial</p>}
             <div className="space-y-2">
               {historial.map((item, idx) => (
-                <div key={idx} className="border p-2 rounded flex justify-between items-center">
+                <div key={item.id || idx} className="border p-2 rounded flex justify-between items-center">
                   <div className="flex-1">
                     <p>{new Date(item.fecha).toLocaleString()} - {item.trabajador.nombre || 'Anónimo'}</p>
                     <p className="text-sm">Total: ${item.resultados.total.toFixed(2)}</p>

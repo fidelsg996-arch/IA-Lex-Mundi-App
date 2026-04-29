@@ -1,13 +1,18 @@
+// src/pages/AnalisisIA.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePersistencia } from '../hooks/usePersistencia';
 
 const AnalisisIA = () => {
   const navigate = useNavigate();
   const [casoTexto, setCasoTexto] = useState('');
   const [analizando, setAnalizando] = useState(false);
   const [resultado, setResultado] = useState(null);
+  
+  // Usar persistencia para guardar el historial de análisis
+  const { datos: historial, guardarDatos, cargando } = usePersistencia('analisis_ia', []);
 
-  const analizarCaso = () => {
+  const analizarCaso = async () => {
     if (!casoTexto.trim()) {
       alert('Por favor, describe el caso jurídico para analizar');
       return;
@@ -16,7 +21,7 @@ const AnalisisIA = () => {
     setAnalizando(true);
     
     // Simulación de análisis con IA
-    setTimeout(() => {
+    setTimeout(async () => {
       const palabrasClave = casoTexto.toLowerCase();
       let analisis = {};
       
@@ -74,6 +79,18 @@ const AnalisisIA = () => {
         };
       }
       
+      // Crear registro del análisis
+      const nuevoAnalisis = {
+        id: Date.now(),
+        fecha: new Date().toISOString(),
+        textoOriginal: casoTexto.substring(0, 200),
+        resultado: analisis
+      };
+      
+      // Guardar en el historial (mantener últimos 20)
+      const nuevoHistorial = [nuevoAnalisis, ...(historial || [])].slice(0, 20);
+      await guardarDatos(nuevoHistorial);
+      
       setResultado(analisis);
       setAnalizando(false);
     }, 2000);
@@ -84,10 +101,30 @@ const AnalisisIA = () => {
     setResultado(null);
   };
 
+  const cargarAnalisisPrevio = (analisisGuardado) => {
+    setCasoTexto(analisisGuardado.textoOriginal);
+    setResultado(analisisGuardado.resultado);
+  };
+
+  const eliminarHistorial = async (id) => {
+    if (window.confirm('¿Eliminar este análisis del historial?')) {
+      const nuevoHistorial = (historial || []).filter(h => h.id !== id);
+      await guardarDatos(nuevoHistorial);
+    }
+  };
+
+  const limpiarTodoHistorial = async () => {
+    if (window.confirm('¿Eliminar TODO el historial de análisis?')) {
+      await guardarDatos([]);
+    }
+  };
+
+  if (cargando) return <div className="text-center py-20">Cargando historial...</div>;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
       <button 
-        onClick={() => navigate('/')} 
+        onClick={() => navigate('/panel-principal')} 
         className="mb-6 text-indigo-500 hover:text-indigo-700 flex items-center gap-2 font-semibold"
       >
         ← Volver al Panel Principal
@@ -96,12 +133,22 @@ const AnalisisIA = () => {
       <div className="max-w-5xl mx-auto">
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white">
-            <div className="flex items-center gap-3">
-              <span className="text-4xl">🤖</span>
-              <div>
-                <h1 className="text-3xl font-bold">Analizador IA</h1>
-                <p className="text-indigo-100 mt-1">Análisis predictivo con inteligencia artificial</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-4xl">🤖</span>
+                <div>
+                  <h1 className="text-3xl font-bold">Analizador IA</h1>
+                  <p className="text-indigo-100 mt-1">Análisis predictivo con inteligencia artificial</p>
+                </div>
               </div>
+              {(historial && historial.length > 0) && (
+                <button
+                  onClick={limpiarTodoHistorial}
+                  className="bg-red-500/20 hover:bg-red-500/30 text-white text-sm px-3 py-1 rounded-lg transition"
+                >
+                  Limpiar historial
+                </button>
+              )}
             </div>
           </div>
 
@@ -119,7 +166,7 @@ const AnalisisIA = () => {
               <p className="text-xs text-gray-400 mt-1">Mínimo 10 caracteres para un análisis preciso</p>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 mb-6">
               <button
                 onClick={analizarCaso}
                 disabled={analizando || casoTexto.trim().length < 10}
@@ -140,6 +187,30 @@ const AnalisisIA = () => {
                 <div className="flex items-center justify-center gap-3">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500"></div>
                   <span className="text-indigo-600">Procesando información con inteligencia artificial...</span>
+                </div>
+              </div>
+            )}
+
+            {/* Historial de análisis previos */}
+            {historial && historial.length > 0 && !analizando && !resultado && (
+              <div className="mt-6">
+                <h3 className="font-bold text-gray-700 mb-3">📜 Análisis anteriores</h3>
+                <div className="space-y-2">
+                  {historial.map((item) => (
+                    <div key={item.id} className="bg-gray-50 p-3 rounded-lg border border-gray-200 flex justify-between items-center hover:bg-gray-100 transition cursor-pointer">
+                      <div onClick={() => cargarAnalisisPrevio(item)} className="flex-1">
+                        <p className="text-sm font-medium text-gray-700">{new Date(item.fecha).toLocaleDateString()}</p>
+                        <p className="text-xs text-gray-500 truncate">{item.textoOriginal}</p>
+                        <p className="text-xs text-indigo-600 mt-1">Tipo: {item.resultado.tipo}</p>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); eliminarHistorial(item.id); }}
+                        className="text-red-400 hover:text-red-600 text-sm ml-2"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

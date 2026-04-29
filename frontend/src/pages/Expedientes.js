@@ -1,7 +1,8 @@
-// src/pages/Expedientes.js
+// src/pages/Expedientes.jsx
 import { useState, useEffect } from 'react';
+import { usePersistencia } from '../hooks/usePersistencia';
 
-// --- Configuración de IndexedDB ---
+// --- Configuración de IndexedDB (para PDFs grandes) ---
 const DB_NAME = 'LexMindiDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'documentos';
@@ -65,7 +66,9 @@ const eliminarDocumentoDeDB = async (docId) => {
 
 // --- Componente principal ---
 const Expedientes = () => {
-  const [expedientes, setExpedientes] = useState([]);
+  // Usar persistencia para los expedientes (metadatos)
+  const { datos: expedientes, guardarDatos, cargando } = usePersistencia('expedientes', []);
+  const [expedientesLocal, setExpedientesLocal] = useState([]);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [formData, setFormData] = useState({
@@ -86,21 +89,19 @@ const Expedientes = () => {
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
 
-  // Cargar expedientes desde localStorage (solo metadatos)
+  // Sincronizar con Firestore cuando cambian los datos
   useEffect(() => {
-    const stored = localStorage.getItem('lexmindi_expedientes');
-    if (stored) {
-      const expedientesConDocumentos = JSON.parse(stored);
-      // Los documentos se cargarán bajo demanda desde IndexedDB
-      setExpedientes(expedientesConDocumentos);
-    } else {
+    if (expedientes && expedientes.length > 0) {
+      setExpedientesLocal(expedientes);
+    } else if (!cargando && (!expedientes || expedientes.length === 0)) {
+      // Datos de ejemplo si no hay nada
       const ejemplos = [
         {
           id: 1, numero: '2025-001', estadoProcesal: 'Activo', parteActora: 'María González',
           parteDemandada: 'Empresa XYZ', asunto: 'Despido improcedente', cuantia: '150,000',
           fecha: '2025-01-15', jurisdiccion: 'México', juzgado: 'Juzgado Primero de lo Laboral',
           secretaria: 'Secretaría A', actuaria: 'Lic. Ana Torres', mesa: 'Mesa 3', notas: 'Demanda presentada',
-          documentos: [] // En lugar de guardar el PDF, guardamos un array de objetos con { id, nombre }
+          documentos: []
         },
         {
           id: 2, numero: '2025-002', estadoProcesal: 'En trámite', parteActora: 'Juan Pérez',
@@ -117,21 +118,10 @@ const Expedientes = () => {
           documentos: []
         }
       ];
-      setExpedientes(ejemplos);
-      localStorage.setItem('lexmindi_expedientes', JSON.stringify(ejemplos));
+      setExpedientesLocal(ejemplos);
+      guardarDatos(ejemplos);
     }
-  }, []);
-
-  // Guardar solo metadatos en localStorage (sin los PDFs)
-  useEffect(() => {
-    if (expedientes.length > 0) {
-      const expedientesSinDocs = expedientes.map(exp => ({
-        ...exp,
-        documentos: exp.documentos ? exp.documentos.map(doc => ({ id: doc.id, nombre: doc.nombre })) : []
-      }));
-      localStorage.setItem('lexmindi_expedientes', JSON.stringify(expedientesSinDocs));
-    }
-  }, [expedientes]);
+  }, [expedientes, cargando]);
 
   const generarId = () => Date.now();
 
@@ -158,30 +148,37 @@ const Expedientes = () => {
     setModalAbierto(true);
   };
 
-  const guardarExpediente = () => {
+  const guardarExpediente = async () => {
     if (!formData.numero || !formData.parteActora || !formData.asunto) {
       alert('Completa los campos obligatorios: número, parte actora y asunto');
       return;
     }
+    
+    let nuevosExpedientes;
     if (editandoId) {
-      setExpedientes(expedientes.map(exp =>
+      nuevosExpedientes = expedientesLocal.map(exp =>
         exp.id === editandoId ? { ...formData, id: editandoId, documentos: exp.documentos || [] } : exp
-      ));
+      );
     } else {
-      setExpedientes([...expedientes, { ...formData, id: generarId(), documentos: [] }]);
+      nuevosExpedientes = [...expedientesLocal, { ...formData, id: generarId(), documentos: [] }];
     }
+    
+    setExpedientesLocal(nuevosExpedientes);
+    await guardarDatos(nuevosExpedientes);
     setModalAbierto(false);
   };
 
   const eliminarExpediente = async (id) => {
     if (window.confirm('¿Eliminar este expediente y todos sus documentos?')) {
-      const expediente = expedientes.find(exp => exp.id === id);
+      const expediente = expedientesLocal.find(exp => exp.id === id);
       if (expediente && expediente.documentos) {
         for (const doc of expediente.documentos) {
           await eliminarDocumentoDeDB(doc.id);
         }
       }
-      setExpedientes(expedientes.filter(exp => exp.id !== id));
+      const nuevosExpedientes = expedientesLocal.filter(exp => exp.id !== id);
+      setExpedientesLocal(nuevosExpedientes);
+      await guardarDatos(nuevosExpedientes);
     }
   };
 
@@ -194,19 +191,21 @@ const Expedientes = () => {
           const docId = `${expId}_${Date.now()}_${archivo.name}`;
           await guardarDocumentoEnDB(docId, archivo.name, base64);
           
-          // Actualizar el expediente en el estado
-          setExpedientes(prev => prev.map(exp => {
+          // Actualizar el expediente
+          const nuevosExpedientes = expedientesLocal.map(exp => {
             if (exp.id === expId) {
               const nuevosDocs = [...(exp.documentos || []), { id: docId, nombre: archivo.name }];
               return { ...exp, documentos: nuevosDocs };
             }
             return exp;
-          }));
+          });
+          setExpedientesLocal(nuevosExpedientes);
+          await guardarDatos(nuevosExpedientes);
         };
         reader.readAsDataURL(archivo);
       } catch (error) {
         console.error('Error al guardar PDF:', error);
-        alert('No se pudo guardar el documento. El archivo es demasiado grande.');
+        alert('No se pudo guardar el documento.');
       }
     } else {
       alert('Solo se permiten archivos PDF');
@@ -216,13 +215,15 @@ const Expedientes = () => {
   const eliminarDocumento = async (expId, docId) => {
     if (window.confirm('¿Eliminar este documento permanentemente?')) {
       await eliminarDocumentoDeDB(docId);
-      setExpedientes(prev => prev.map(exp => {
+      const nuevosExpedientes = expedientesLocal.map(exp => {
         if (exp.id === expId) {
           const nuevosDocs = (exp.documentos || []).filter(doc => doc.id !== docId);
           return { ...exp, documentos: nuevosDocs };
         }
         return exp;
-      }));
+      });
+      setExpedientesLocal(nuevosExpedientes);
+      await guardarDatos(nuevosExpedientes);
     }
   };
 
@@ -246,7 +247,7 @@ const Expedientes = () => {
     return 'bg-gray-100 text-gray-800';
   };
 
-  const expedientesFiltrados = expedientes.filter(exp => {
+  const expedientesFiltrados = expedientesLocal.filter(exp => {
     if (filtroEstado !== 'todos') {
       const lowerEstado = exp.estadoProcesal?.toLowerCase();
       if (filtroEstado === 'activo' && lowerEstado !== 'activo') return false;
@@ -260,9 +261,11 @@ const Expedientes = () => {
     return true;
   });
 
+  if (cargando) return <div className="text-center py-20">Cargando expedientes...</div>;
+
   return (
     <div className="px-4">
-      {/* Portada estilo CalculadoraLaboral */}
+      {/* Portada */}
       <div className="relative rounded-2xl overflow-hidden shadow-lg mb-6">
         <div className="absolute inset-0 bg-gradient-to-r from-slate-900 to-slate-700"></div>
         <img 
@@ -382,7 +385,7 @@ const Expedientes = () => {
         </div>
       )}
 
-      {/* Modal (sin cambios) */}
+      {/* Modal */}
       {modalAbierto && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl p-6 max-h-[90vh] overflow-y-auto">

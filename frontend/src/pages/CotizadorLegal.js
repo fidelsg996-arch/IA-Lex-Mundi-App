@@ -1,5 +1,6 @@
-// src/pages/CotizadorLegal.js
+// src/pages/CotizadorLegal.jsx
 import { useState, useEffect } from 'react';
+import { usePersistencia } from '../hooks/usePersistencia';
 
 // Catálogo base de servicios legales
 const serviciosBase = [
@@ -35,7 +36,24 @@ const gastosComunes = [
 ];
 
 const CotizadorLegal = () => {
-  // Datos del despacho
+  // Usar persistencia para el historial de cotizaciones
+  const { datos: historialData, guardarDatos: guardarHistorial, cargando: cargandoHistorial } = usePersistencia('cotizador_historial', []);
+  const { datos: despachoData, guardarDatos: guardarDespacho } = usePersistencia('cotizador_despacho', {
+    nombre: '',
+    cedula: '',
+    direccion: '',
+    email: '',
+    telefono: '',
+    regimen: 'Persona Física'
+  });
+  const { datos: clienteData, guardarDatos: guardarCliente } = usePersistencia('cotizador_cliente', {
+    nombre: '',
+    rfc: '',
+    correo: '',
+    telefono: '',
+    direccion: ''
+  });
+
   const [despacho, setDespacho] = useState({
     nombre: '',
     cedula: '',
@@ -44,8 +62,6 @@ const CotizadorLegal = () => {
     telefono: '',
     regimen: 'Persona Física'
   });
-
-  // Datos del cliente
   const [cliente, setCliente] = useState({
     nombre: '',
     rfc: '',
@@ -53,8 +69,6 @@ const CotizadorLegal = () => {
     telefono: '',
     direccion: ''
   });
-
-  // Servicios seleccionados con precios editables
   const [serviciosSeleccionados, setServiciosSeleccionados] = useState([]);
   const [montoCaso, setMontoCaso] = useState(0);
   const [gastosSeleccionados, setGastosSeleccionados] = useState([]);
@@ -67,19 +81,38 @@ const CotizadorLegal = () => {
   const [filtroHistorial, setFiltroHistorial] = useState('');
   const [materiaSeleccionada, setMateriaSeleccionada] = useState('');
 
-  // Cargar historial
+  // Sincronizar datos con Firestore
   useEffect(() => {
-    const stored = localStorage.getItem('cotizador_legal_historial');
-    if (stored) setHistorial(JSON.parse(stored));
-  }, []);
+    if (despachoData && !cargandoHistorial) {
+      setDespacho(despachoData);
+    }
+    if (clienteData && !cargandoHistorial) {
+      setCliente(clienteData);
+    }
+    if (historialData && !cargandoHistorial) {
+      setHistorial(historialData);
+    }
+  }, [despachoData, clienteData, historialData, cargandoHistorial]);
 
-  const guardarEnHistorial = (cotizacion) => {
+  // Guardar cambios en Firestore
+  useEffect(() => {
+    if (despacho.nombre || despacho.cedula) {
+      guardarDespacho(despacho);
+    }
+  }, [despacho]);
+
+  useEffect(() => {
+    if (cliente.nombre || cliente.rfc) {
+      guardarCliente(cliente);
+    }
+  }, [cliente]);
+
+  const guardarEnHistorial = async (cotizacion) => {
     const nuevoHistorial = [cotizacion, ...historial].slice(0, 20);
     setHistorial(nuevoHistorial);
-    localStorage.setItem('cotizador_legal_historial', JSON.stringify(nuevoHistorial));
+    await guardarHistorial(nuevoHistorial);
   };
 
-  // Calcular honorarios (ahora toma los precios editables de los servicios)
   const calcularHonorarios = () => {
     let total = 0;
     const desgloseHonorarios = [];
@@ -89,7 +122,6 @@ const CotizadorLegal = () => {
       if (servicioBase && servicioBase.tipo === 'porcentaje') {
         monto = (servicioBase.valor / 100) * montoCaso;
       }
-      // Multiplicar por cantidad si existe
       const cantidad = serv.cantidad || 1;
       const totalItem = monto * cantidad;
       total += totalItem;
@@ -106,7 +138,6 @@ const CotizadorLegal = () => {
     return { total, desglose: desgloseHonorarios };
   };
 
-  // Calcular gastos
   const calcularGastos = () => {
     let total = 0;
     const desgloseGastos = [];
@@ -120,7 +151,6 @@ const CotizadorLegal = () => {
     return { total, desglose: desgloseGastos };
   };
 
-  // Recalcular todo
   const recalcular = () => {
     const honorarios = calcularHonorarios();
     const gastos = calcularGastos();
@@ -148,7 +178,6 @@ const CotizadorLegal = () => {
     recalcular();
   }, [serviciosSeleccionados, montoCaso, gastosSeleccionados, descuentoPorcentaje, incluirIVA]);
 
-  // Funciones para manejar servicios
   const toggleServicio = (servicioBase, cantidad = 1) => {
     const existe = serviciosSeleccionados.find(s => s.id === servicioBase.id);
     if (existe) {
@@ -176,7 +205,6 @@ const CotizadorLegal = () => {
     if (!materiaSeleccionada) return;
     const materia = materiasJudiciales.find(m => m.id === materiaSeleccionada);
     if (!materia) return;
-    // Verificar si ya existe esa materia como servicio (por nombre)
     const existe = serviciosSeleccionados.some(s => s.id === materia.id);
     if (!existe) {
       setServiciosSeleccionados([...serviciosSeleccionados, { 
@@ -198,7 +226,6 @@ const CotizadorLegal = () => {
     }
   };
 
-  // Generar PDF tipo factura digital con datos del despacho
   const generarFacturaPDF = () => {
     if (!resultados) return;
     const ventana = window.open('', '_blank');
@@ -414,9 +441,10 @@ const CotizadorLegal = () => {
     ventana.print();
   };
 
-  const guardarCotizacion = () => {
+  const guardarCotizacion = async () => {
     if (!resultados) return;
     const cotizacion = {
+      id: Date.now(),
       fecha: new Date().toISOString(),
       folio: resultados.folio,
       despacho,
@@ -429,8 +457,8 @@ const CotizadorLegal = () => {
       notas,
       resultados
     };
-    guardarEnHistorial(cotizacion);
-    alert('Cotización guardada en el historial');
+    await guardarEnHistorial(cotizacion);
+    alert('✅ Cotización guardada en el historial');
   };
 
   const cargarDelHistorial = (item) => {
@@ -446,19 +474,19 @@ const CotizadorLegal = () => {
     setMostrarHistorial(false);
   };
 
-  const eliminarDelHistorial = (index) => {
+  const eliminarDelHistorial = async (index) => {
     if (window.confirm('¿Eliminar esta cotización del historial?')) {
       const nuevo = [...historial];
       nuevo.splice(index, 1);
       setHistorial(nuevo);
-      localStorage.setItem('cotizador_legal_historial', JSON.stringify(nuevo));
+      await guardarHistorial(nuevo);
     }
   };
 
-  const borrarHistorialCompleto = () => {
+  const borrarHistorialCompleto = async () => {
     if (window.confirm('¿Borrar todo el historial de cotizaciones?')) {
       setHistorial([]);
-      localStorage.setItem('cotizador_legal_historial', JSON.stringify([]));
+      await guardarHistorial([]);
     }
   };
 
@@ -466,6 +494,8 @@ const CotizadorLegal = () => {
     item.cliente.nombre?.toLowerCase().includes(filtroHistorial.toLowerCase()) ||
     item.despacho.nombre?.toLowerCase().includes(filtroHistorial.toLowerCase())
   );
+
+  if (cargandoHistorial) return <div className="text-center py-20">Cargando cotizador...</div>;
 
   return (
     <div className="px-4">
@@ -638,7 +668,7 @@ const CotizadorLegal = () => {
             {historialFiltrado.length === 0 && <p className="text-gray-500 text-center py-4">Sin cotizaciones guardadas</p>}
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {historialFiltrado.map((item, idx) => (
-                <div key={idx} className="border p-2 rounded flex justify-between items-center">
+                <div key={item.id || idx} className="border p-2 rounded flex justify-between items-center">
                   <div>
                     <p>{new Date(item.fecha).toLocaleString()} - <strong>{item.cliente.nombre || 'Cliente'}</strong> | Total: ${item.resultados.total.toFixed(2)}</p>
                     <p className="text-xs text-gray-500">Folio: {item.folio}</p>

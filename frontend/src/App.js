@@ -6,7 +6,7 @@ import { BilleteraProvider } from './context/BilleteraContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './LandingPage';
 import Login from './Login';
-import Registrarse from './pages/Registrarse';  // ✅ Importación agregada
+import Registrarse from './pages/Registrarse';
 import Layout from './Layout';
 import AdminPanel from './pages/AdminPanel';
 import AdminFirmas from './components/AdminFirmas';
@@ -23,8 +23,9 @@ import GuiaTramites from './pages/GuiaTramites';
 import Legislacion from './pages/Legislacion';
 import QuizLegal from './pages/QuizLegal';
 import Libros from './pages/Libros';
-import Cursos from './pages/Cursos';
-import Diplomados from './pages/Diplomados';
+import Cursos from './pages/Cursos/Cursos';
+import CursoDetalle from './pages/Cursos/CursoDetalle';
+import Diplomados from './pages/Diplomados/Diplomados';
 import Torneos from './modules/Torneos';
 import Herramientas from './pages/Herramientas';
 import DescargarAndroid from './pages/DescargarAndroid';
@@ -63,6 +64,7 @@ function App() {
                 <Route path="/quiz-legal" element={<QuizLegal />} />
                 <Route path="/libros" element={<Libros />} />
                 <Route path="/cursos" element={<Cursos />} />
+                <Route path="/cursos/:id" element={<CursoDetalle />} />
                 <Route path="/diplomados" element={<Diplomados />} />
                 <Route path="/torneos" element={<Torneos />} />
                 <Route path="/mi-suscripcion" element={<MiSuscripcion />} />

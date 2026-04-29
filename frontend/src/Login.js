@@ -1,66 +1,45 @@
-// src/Login.js
+// src/Login.jsx
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     try {
       await login(email, password);
       navigate('/panel-principal');
     } catch (err) {
-      setError(err.message);
+      setError('Correo o contraseña incorrectos');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md border border-gray-200">
-        <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">Iniciar sesión</h1>
-        <p className="text-center text-gray-500 mb-6">Accede a tu cuenta</p>
-        {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+        <h1 className="text-2xl font-bold text-center mb-6">Iniciar Sesión</h1>
+        {error && <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-center">{error}</div>}
         <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">Correo electrónico</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-              required
-            />
-          </div>
-          <div className="mb-6">
-            <label className="block text-gray-700 text-sm font-bold mb-2">Contraseña</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-              required
-            />
-          </div>
-          <button type="submit" className="w-full bg-amber-500 text-white font-bold py-2 rounded-lg hover:bg-amber-600 transition">
-            Ingresar
+          <input type="email" placeholder="Email" className="w-full p-3 border rounded-lg mb-3" value={email} onChange={e => setEmail(e.target.value)} required />
+          <input type="password" placeholder="Contraseña" className="w-full p-3 border rounded-lg mb-4" value={password} onChange={e => setPassword(e.target.value)} required />
+          <button type="submit" disabled={loading} className="w-full bg-amber-500 text-white p-3 rounded-lg font-semibold hover:bg-amber-600">
+            {loading ? 'Cargando...' : 'Entrar'}
           </button>
         </form>
-        <p className="mt-4 text-center text-sm text-gray-600">
-          ¿No tienes cuenta? <Link to="/registrarse" className="text-amber-600 font-semibold">Regístrate</Link>
-        </p>
-        <p className="mt-2 text-center text-xs text-gray-400">
-          Admin: admin@lexmundi.ia / admin
-        </p>
+        <p className="text-center mt-4">¿No tienes cuenta? <Link to="/registrarse" className="text-amber-500">Regístrate</Link></p>
       </div>
     </div>
   );
 };
-
 export default Login;

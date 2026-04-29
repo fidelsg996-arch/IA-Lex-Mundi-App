@@ -1,5 +1,5 @@
 // src/pages/MiSuscripcion.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 const PLANES = [
@@ -28,7 +28,7 @@ const PLANES = [
     nombre: 'Premium',
     precio: 399,
     periodo: 'mensual',
-    caracteristicas: ['Todo lo de Pro', 'Asesoría legal personalizada', 'Insignia de verificación'],
+    caracteristicas: ['Todo lo de Pro', 'Asesoría legal personalizada', 'Insignia de verificación', 'Constancias automáticas'],
     color: 'yellow',
     colorClass: 'border-yellow-400 bg-yellow-50',
     buttonClass: 'bg-yellow-600 hover:bg-yellow-700',
@@ -39,34 +39,63 @@ const MiSuscripcion = () => {
   const { user, updateUserPlan } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [procesando, setProcesando] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState('free');
+  const [loading, setLoading] = useState(true);
 
-  const currentPlanId = user?.plan || 'free';
+  useEffect(() => {
+    if (user) {
+      setCurrentPlan(user.plan || 'free');
+    }
+    setLoading(false);
+  }, [user]);
 
   const handleUpgrade = async (planId) => {
-    if (planId === currentPlanId) return;
+    if (planId === currentPlan) return;
+    
     setSelectedPlan(planId);
     setProcesando(true);
-    // Simular proceso de pago (después conectar con pasarela real)
-    setTimeout(() => {
-      const success = updateUserPlan(planId);
+    
+    // Simular proceso de pago (después conectar con Stripe/MercadoPago)
+    setTimeout(async () => {
+      const success = await updateUserPlan(planId);
       if (success) {
-        alert(`¡Suscripción actualizada a ${PLANES.find(p => p.id === planId).nombre}!`);
+        setCurrentPlan(planId);
+        alert(`✅ ¡Suscripción actualizada a ${PLANES.find(p => p.id === planId).nombre}!`);
       } else {
-        alert('Error al actualizar el plan. Intenta de nuevo.');
+        alert('❌ Error al actualizar el plan. Intenta de nuevo.');
       }
       setProcesando(false);
       setSelectedPlan(null);
     }, 1500);
   };
 
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-6 text-center py-20">
+        <div className="spinner-border text-amber-500" role="status">
+          <span className="visually-hidden">Cargando suscripción...</span>
+        </div>
+        <p className="mt-3 text-gray-500">Cargando tu plan...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto p-6">
       <h1 className="text-3xl font-bold text-gray-800 mb-2">Mi Suscripción</h1>
       <p className="text-gray-600 mb-8">Elige el plan que mejor se adapte a tus necesidades</p>
 
+      {/* Información del usuario */}
+      <div className="bg-blue-50 rounded-xl p-4 mb-8">
+        <p className="text-blue-800">
+          <strong>Usuario:</strong> {user?.email} <br />
+          <strong>Plan actual:</strong> <span className="font-bold">{PLANES.find(p => p.id === currentPlan)?.nombre || 'Gratuito'}</span>
+        </p>
+      </div>
+
       <div className="grid md:grid-cols-3 gap-6">
         {PLANES.map((plan) => {
-          const isCurrent = currentPlanId === plan.id;
+          const isCurrent = currentPlan === plan.id;
           return (
             <div
               key={plan.id}
@@ -82,7 +111,7 @@ const MiSuscripcion = () => {
                 </div>
                 {isCurrent && (
                   <span className="inline-block mt-3 bg-green-500 text-white text-xs px-3 py-1 rounded-full">
-                    Plan actual
+                    ✓ Plan actual
                   </span>
                 )}
               </div>
@@ -105,7 +134,7 @@ const MiSuscripcion = () => {
                       procesando && selectedPlan === plan.id ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   >
-                    {procesando && selectedPlan === plan.id ? 'Procesando...' : plan.precio === 0 ? 'Mantener gratuito' : 'Cambiar a este plan'}
+                    {procesando && selectedPlan === plan.id ? 'Procesando...' : plan.precio === 0 ? 'Cambiar a Gratuito' : `Cambiar a ${plan.nombre}`}
                   </button>
                 ) : (
                   <button disabled className="w-full py-3 rounded-lg bg-gray-300 text-gray-500 font-semibold cursor-not-allowed">
@@ -116,6 +145,15 @@ const MiSuscripcion = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* Información adicional */}
+      <div className="mt-8 bg-gray-50 rounded-xl p-6 text-center">
+        <p className="text-gray-600 text-sm">
+          🔒 Los pagos son seguros y procesados a través de Stripe. <br />
+          Puedes cancelar tu suscripción en cualquier momento desde este panel. <br />
+          Al actualizar tu plan, los cambios se reflejarán inmediatamente.
+        </p>
       </div>
     </div>
   );

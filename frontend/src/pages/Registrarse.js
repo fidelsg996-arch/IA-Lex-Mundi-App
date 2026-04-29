@@ -1,78 +1,52 @@
-// src/pages/Registrarse.js
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+// src/pages/Registrarse.jsx
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Registrarse = () => {
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [name, setName] = useState('');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    if (password !== confirm) {
+      setError('Las contraseñas no coinciden');
+      return;
+    }
+    setLoading(true);
     try {
       await register(email, password, name);
-      setSuccess('Cuenta creada correctamente. Ahora puedes iniciar sesión.');
-      setTimeout(() => navigate('/acceso'), 2000);
+      navigate('/panel-principal');
     } catch (err) {
-      setError(err.message);
+      setError('Error al registrar: ' + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md border border-gray-200">
-        <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">Crear cuenta</h1>
-        <p className="text-center text-gray-500 mb-6">Regístrate para acceder a todas las herramientas</p>
-        {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
-        {success && <p className="text-green-500 text-sm text-center mb-4">{success}</p>}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+        <h1 className="text-2xl font-bold text-center mb-6">Registrarse</h1>
+        {error && <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-center">{error}</div>}
         <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">Nombre completo</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">Correo electrónico</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-              required
-            />
-          </div>
-          <div className="mb-6">
-            <label className="block text-gray-700 text-sm font-bold mb-2">Contraseña</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-              required
-            />
-          </div>
-          <button type="submit" className="w-full bg-amber-500 text-white font-bold py-2 rounded-lg hover:bg-amber-600 transition">
-            Registrarse
+          <input type="text" placeholder="Nombre completo" className="w-full p-3 border rounded-lg mb-3" value={name} onChange={e => setName(e.target.value)} required />
+          <input type="email" placeholder="Email" className="w-full p-3 border rounded-lg mb-3" value={email} onChange={e => setEmail(e.target.value)} required />
+          <input type="password" placeholder="Contraseña" className="w-full p-3 border rounded-lg mb-3" value={password} onChange={e => setPassword(e.target.value)} required />
+          <input type="password" placeholder="Confirmar contraseña" className="w-full p-3 border rounded-lg mb-4" value={confirm} onChange={e => setConfirm(e.target.value)} required />
+          <button type="submit" disabled={loading} className="w-full bg-amber-500 text-white p-3 rounded-lg font-semibold hover:bg-amber-600">
+            {loading ? 'Registrando...' : 'Registrarse'}
           </button>
         </form>
-        <p className="mt-4 text-center text-sm text-gray-600">
-          ¿Ya tienes cuenta? <Link to="/acceso" className="text-amber-600 font-semibold">Inicia sesión</Link>
-        </p>
+        <p className="text-center mt-4">¿Ya tienes cuenta? <Link to="/acceso" className="text-amber-500">Inicia sesión</Link></p>
       </div>
     </div>
   );
 };
-
 export default Registrarse;
