@@ -472,6 +472,7 @@ const Libros = () => {
               <span className="material-symbols-outlined text-4xl text-amber-400">menu_book</span>
               <h1 className="text-2xl font-black">Biblioteca Jurídica</h1>
             </div>
+            {/* ✅ CORREGIDO: Solo muestra el botón Admin si NO está en modo admin */}
             {!modoAdmin ? (
               <button 
                 onClick={() => setShowAdminLogin(true)}
@@ -536,6 +537,7 @@ const Libros = () => {
               <span className="material-symbols-outlined text-amber-500 text-sm">library_books</span>
               <span className="text-xs text-gray-600">{librosFiltrados.length} títulos</span>
             </div>
+            {/* ✅ CORREGIDO: Solo muestra "Nuevo Libro" si está en modo admin */}
             {modoAdmin && (
               <button
                 onClick={abrirFormNuevo}
@@ -574,6 +576,7 @@ const Libros = () => {
                     </div>
                     <h3 className="text-sm font-bold text-gray-800 line-clamp-2">{libro.titulo}</h3>
                     <p className="text-amber-700 font-bold text-sm mt-1">${libro.precio.toFixed(2)} MXN</p>
+                    {/* ✅ CORREGIDO: Solo muestra botones de admin si está en modo admin */}
                     {modoAdmin && (
                       <div className="flex gap-2 mt-2">
                         <button onClick={(e) => { e.stopPropagation(); abrirFormEditar(libro); }} className="text-xs text-blue-500">Editar</button>
@@ -642,6 +645,7 @@ const Libros = () => {
                   {typeof libro.paginas === 'number' ? `${libro.paginas} págs.` : libro.paginas}
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* ✅ CORREGIDO: Solo muestra botones de editar/eliminar si está en modo admin */}
                   {modoAdmin && (
                     <>
                       <button 

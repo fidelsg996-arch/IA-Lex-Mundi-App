@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useDiplomadosData } from './hooks/useDiplomadosData';
-import ModalAdminLogin from './components/ModalAdminLogin';
+import ModalAdminLogin from '../../components/ModalAdminLogin';
 import ListaDiplomadosPhase from './phases/ListaDiplomadosPhase';
 import DiplomadoDetallePhase from './phases/DiplomadoDetallePhase';
 import ModuloPhase from './phases/ModuloPhase';
@@ -33,15 +33,15 @@ const Diplomados = () => {
   const [editandoDiplomado, setEditandoDiplomado] = useState(null);
   const [mostrarConstancia, setMostrarConstancia] = useState(false);
 
-  const marcarCompletada = async (did, mid, lid, titulo) => {
-    if (!estaCompletada(did, mid, lid)) {
-      const exito = await guardarProgreso(did, mid, lid);
-      if (exito) {
-        alert(`✅ ¡Lección "${titulo}" completada!`);
-        await cargarDiplomados();
-      } else {
-        alert("❌ Error al guardar el progreso");
-      }
+  const verificarCompletada = (diplomadoId, moduloId, leccionId) => {
+    return estaCompletada(diplomadoId, moduloId, leccionId);
+  };
+
+  const marcarCompletada = async (diplomadoId, moduloId, leccionId, leccionTitulo) => {
+    if (!estaCompletada(diplomadoId, moduloId, leccionId)) {
+      await guardarProgreso(diplomadoId, moduloId, leccionId);
+      alert(`✅ ¡Lección "${leccionTitulo}" completada!`);
+      await cargarDiplomados();
     }
   };
 
@@ -69,13 +69,36 @@ const Diplomados = () => {
           onAbrirFormNuevo={() => { setEditandoDiplomado(null); setShowForm(true); }}
           calcularProgreso={calcularProgresoDiplomado}
         />
+        
         {!modoAdmin && (
-          <button onClick={() => setShowAdminLogin(true)} className="fixed bottom-4 right-4 bg-gray-800 text-white p-3 rounded-full shadow-lg z-50">
-            Admin
+          <button 
+            onClick={() => setShowAdminLogin(true)} 
+            className="fixed bottom-4 right-4 bg-gray-800 text-white p-3 rounded-full shadow-lg hover:bg-gray-700 z-50 flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-sm">admin_panel_settings</span>
+            <span className="text-sm font-semibold">Admin</span>
           </button>
         )}
-        <ModalAdminLogin show={showAdminLogin} onClose={() => setShowAdminLogin(false)} onSuccess={() => { setModoAdmin(true); setShowAdminLogin(false); alert('✅ Modo administrador activado'); }} />
-        <FormularioDiplomado show={showForm} diplomadoEditado={editandoDiplomado} onClose={() => { setShowForm(false); setEditandoDiplomado(null); }} onSave={handleGuardarDiplomado} />
+        
+        <ModalAdminLogin 
+          show={showAdminLogin} 
+          onClose={() => setShowAdminLogin(false)}
+          onSuccess={() => {
+            setModoAdmin(true);
+            setShowAdminLogin(false);
+            alert('✅ Modo administrador activado');
+          }}
+        />
+        
+        <FormularioDiplomado 
+          show={showForm}
+          diplomadoEditado={editandoDiplomado}
+          onClose={() => {
+            setShowForm(false);
+            setEditandoDiplomado(null);
+          }}
+          onSave={handleGuardarDiplomado}
+        />
       </>
     );
   }
@@ -86,9 +109,8 @@ const Diplomados = () => {
         diplomado={diplomadoSeleccionado}
         onBack={() => { setDiplomadoSeleccionado(null); setVista('cursos'); cargarDiplomados(); }}
         onSeleccionarModulo={(m) => { setModuloActual(m); setVista('modulo'); }}
-        estaCompletada={estaCompletada}
+        estaCompletada={verificarCompletada}
         onGenerarConstancia={() => setMostrarConstancia(true)}
-        calcularProgresoDiplomado={calcularProgresoDiplomado}
       />
     );
   }
@@ -100,17 +122,17 @@ const Diplomados = () => {
         modulo={moduloActual}
         onBack={() => setVista('curso')}
         onSeleccionarLeccion={(l) => { setLeccionActual(l); setVista('leccion'); }}
-        estaCompletada={estaCompletada}
+        estaCompletada={verificarCompletada}
       />
     );
   }
 
   if (vista === 'leccion' && leccionActual && moduloActual && diplomadoSeleccionado) {
-    const completada = estaCompletada(diplomadoSeleccionado.id, moduloActual.id, leccionActual.id);
+    const completada = verificarCompletada(diplomadoSeleccionado.id, moduloActual.id, leccionActual.id);
     const leccionesLista = moduloActual.leccionesLista || [];
     const idxActual = leccionesLista.findIndex(l => l.id === leccionActual.id);
     const siguienteLeccion = leccionesLista[idxActual + 1];
-    
+
     return (
       <LeccionPhase 
         diplomado={diplomadoSeleccionado}

@@ -155,6 +155,39 @@ export const BilleteraProvider = ({ children }) => {
     return false;
   };
 
+  // ============================================================
+  // REALIZAR PAGO (para torneos, cursos, etc.)
+  // ============================================================
+  const realizarPago = async (monto, concepto) => {
+    if (!user) {
+      console.error("No hay usuario autenticado");
+      return false;
+    }
+    
+    if (saldo < monto) {
+      alert(`❌ Saldo insuficiente. Necesitas $${monto} MXN.`);
+      return false;
+    }
+    
+    const nuevoSaldo = saldo - monto;
+    const nuevaTransaccion = {
+      id: Date.now(),
+      fecha: new Date().toISOString(),
+      tipo: 'Pago',
+      monto: -monto,
+      descripcion: concepto || `Pago de $${monto} MXN`
+    };
+    const nuevasTransacciones = [nuevaTransaccion, ...transacciones];
+    
+    const exito = await guardarDatos(nuevoSaldo, nuevasTransacciones);
+    if (exito) {
+      setSaldo(nuevoSaldo);
+      setTransacciones(nuevasTransacciones);
+      return true;
+    }
+    return false;
+  };
+
   useEffect(() => {
     cargarDatos();
   }, [user]);
@@ -168,6 +201,7 @@ export const BilleteraProvider = ({ children }) => {
       recargaAdmin,
       transferir,
       retirar,
+      realizarPago,  // ✅ Función agregada
       cargarDatos
     }}>
       {children}

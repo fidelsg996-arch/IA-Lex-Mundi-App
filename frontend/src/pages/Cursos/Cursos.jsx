@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useCursosData } from './hooks/useCursosData';
-import ModalAdminLogin from './components/ModalAdminLogin';
+import ModalAdminLogin from '../../components/ModalAdminLogin';
 import ListaCursosPhase from './phases/ListaCursosPhase';
 import CursoDetallePhase from './phases/CursoDetallePhase';
 import ModuloPhase from './phases/ModuloPhase';
@@ -19,33 +19,27 @@ const Cursos = () => {
     actualizarPremioTorneo, 
     cargarCursos,
     guardarProgreso,
-    estaCompletada
+    estaCompletada,
+    calcularProgresoCurso
   } = useCursosData();
   
   const [vista, setVista] = useState('cursos');
   const [cursoSeleccionado, setCursoSeleccionado] = useState(null);
   const [moduloActual, setModuloActual] = useState(null);
   const [leccionActual, setLeccionActual] = useState(null);
-  const [leccionesCompletadasLocal, setLeccionesCompletadasLocal] = useState([]);
   const [modoAdmin, setModoAdmin] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editandoCurso, setEditandoCurso] = useState(null);
   const [mostrarConstancia, setMostrarConstancia] = useState(false);
 
-  console.log("📊 Cursos en Cursos.jsx:", cursos.length);
-  console.log("📊 Modo Admin en Cursos.jsx:", modoAdmin);
-
   const verificarCompletada = (cursoId, moduloId, leccionId) => {
     return estaCompletada(cursoId, moduloId, leccionId);
   };
 
   const marcarCompletada = async (cursoId, moduloId, leccionId, leccionTitulo) => {
-    const key = `${cursoId}-${moduloId}-${leccionId}`;
-    
     if (!estaCompletada(cursoId, moduloId, leccionId)) {
       await guardarProgreso(cursoId, moduloId, leccionId);
-      setLeccionesCompletadasLocal([...leccionesCompletadasLocal, key]);
       alert(`✅ ¡Lección "${leccionTitulo}" completada!`);
       await cargarCursos();
     }
@@ -56,14 +50,10 @@ const Cursos = () => {
     await cargarCursos();
   };
 
-  const cerrarConstancia = () => {
-    setMostrarConstancia(false);
-  };
-
   if (loading) return <div className="text-center py-20">Cargando cursos...</div>;
 
   if (mostrarConstancia && cursoSeleccionado) {
-    return <ConstanciaPhase curso={cursoSeleccionado} user={user} onBack={cerrarConstancia} />;
+    return <ConstanciaPhase curso={cursoSeleccionado} user={user} onBack={() => setMostrarConstancia(false)} />;
   }
 
   if (vista === 'cursos') {
@@ -77,6 +67,7 @@ const Cursos = () => {
           onTogglePremio={actualizarPremioTorneo}
           onSeleccionarCurso={(curso) => { setCursoSeleccionado(curso); setVista('curso'); }}
           onAbrirFormNuevo={() => { setEditandoCurso(null); setShowForm(true); }}
+          calcularProgreso={calcularProgresoCurso}
         />
         
         {!modoAdmin && (

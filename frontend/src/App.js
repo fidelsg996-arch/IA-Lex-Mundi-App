@@ -26,7 +26,8 @@ import Libros from './pages/Libros';
 import Cursos from './pages/Cursos/Cursos';
 import CursoDetalle from './pages/Cursos/CursoDetalle';
 import Diplomados from './pages/Diplomados/Diplomados';
-import Torneos from './modules/Torneos';
+import Torneos from './pages/Torneos/Torneos';
+import ReclamarPremio from './pages/ReclamarPremio';
 import Herramientas from './pages/Herramientas';
 import DescargarAndroid from './pages/DescargarAndroid';
 import SuscripcionFree from './pages/SuscripcionFree';
@@ -67,6 +68,7 @@ function App() {
                 <Route path="/cursos/:id" element={<CursoDetalle />} />
                 <Route path="/diplomados" element={<Diplomados />} />
                 <Route path="/torneos" element={<Torneos />} />
+                <Route path="/reclamar-premio" element={<ReclamarPremio />} />
                 <Route path="/mi-suscripcion" element={<MiSuscripcion />} />
                 <Route path="/mi-billetera" element={<MiBilletera />} />
               </Route>
