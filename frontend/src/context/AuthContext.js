@@ -107,8 +107,13 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Verificar si es admin
-  const isAdmin = () => user?.role === 'admin';
+  // ✅ Verificar si es admin (por email específico o por rol en Firestore)
+  const isAdmin = () => {
+    // Admin por email específico de prueba
+    if (user?.email === 'admin@lexmundi.ia') return true;
+    // Admin por rol en Firestore (para otros admins registrados)
+    return user?.role === 'admin';
+  };
 
   // Cargar datos del usuario desde Firestore cuando cambia la autenticación
   useEffect(() => {

@@ -6,12 +6,10 @@ import CursoDetallePhase from './phases/CursoDetallePhase';
 import ModuloPhase from './phases/ModuloPhase';
 import LeccionPhase from './phases/LeccionPhase';
 import ConstanciaPhase from './phases/ConstanciaPhase';
-import FormularioCurso from './components/FormularioCurso';  // ✅ IMPORTACIÓN AGREGADA
-
-const ADMIN_EMAIL = 'admin@lexmundi.ia';
+import FormularioCurso from './components/FormularioCurso';
 
 const Cursos = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { 
     cursos, 
     loading, 
@@ -28,19 +26,9 @@ const Cursos = () => {
   const [cursoSeleccionado, setCursoSeleccionado] = useState(null);
   const [moduloActual, setModuloActual] = useState(null);
   const [leccionActual, setLeccionActual] = useState(null);
-  const [modoAdmin, setModoAdmin] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editandoCurso, setEditandoCurso] = useState(null);
   const [mostrarConstancia, setMostrarConstancia] = useState(false);
-
-  // Detectar si el usuario es admin
-  useEffect(() => {
-    if (user && user.email === ADMIN_EMAIL) {
-      setModoAdmin(true);
-    } else {
-      setModoAdmin(false);
-    }
-  }, [user]);
 
   const verificarCompletada = (cursoId, moduloId, leccionId) => {
     return estaCompletada(cursoId, moduloId, leccionId);
@@ -88,7 +76,7 @@ const Cursos = () => {
   if (vista === 'cursos') {
     return (
       <>
-        {/* Portada - SOLO IMAGEN */}
+        {/* Portada */}
         <div className="relative rounded-2xl overflow-hidden shadow-lg mb-6">
           <img 
             src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=2070&auto=format&fit=crop"
@@ -96,7 +84,7 @@ const Cursos = () => {
             className="w-full h-32 object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-          <div className="absolute bottom-4 left-4 z-10 text-white">
+          <div className="absolute bottom-4 left-4 text-white">
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-4xl text-blue-300">school</span>
               <div>
@@ -109,7 +97,7 @@ const Cursos = () => {
 
         <ListaCursosPhase 
           cursos={cursos}
-          modoAdmin={modoAdmin}
+          modoAdmin={isAdmin()}
           onEditar={(curso) => { setEditandoCurso(curso); setShowForm(true); }}
           onEliminar={eliminarCurso}
           onTogglePremio={actualizarPremioTorneo}
@@ -118,8 +106,8 @@ const Cursos = () => {
           calcularProgreso={calcularProgresoCurso || (() => 0)}
         />
         
-        {/* Indicador de Admin */}
-        {modoAdmin && (
+        {/* Indicador de Admin flotante */}
+        {isAdmin() && (
           <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2">
             <div className="bg-amber-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
               <span className="material-symbols-outlined text-sm">admin_panel_settings</span>
@@ -128,22 +116,20 @@ const Cursos = () => {
           </div>
         )}
         
-        {/* Formulario de Curso */}
-        {showForm && (
-          <FormularioCurso 
-            show={showForm}
-            cursoEditado={editandoCurso}
-            onClose={() => {
-              setShowForm(false);
-              setEditandoCurso(null);
-            }}
-            onSave={handleGuardarCurso}
-          />
-        )}
+        <FormularioCurso 
+          show={showForm}
+          cursoEditado={editandoCurso}
+          onClose={() => {
+            setShowForm(false);
+            setEditandoCurso(null);
+          }}
+          onSave={handleGuardarCurso}
+        />
       </>
     );
   }
 
+  // ... resto del código igual
   if (vista === 'curso' && cursoSeleccionado) {
     return (
       <CursoDetallePhase 
