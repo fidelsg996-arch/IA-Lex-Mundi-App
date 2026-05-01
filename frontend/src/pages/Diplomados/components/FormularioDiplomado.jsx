@@ -1,271 +1,172 @@
-import { useState, useEffect } from 'react';
-
-const CLOUD_NAME = "di50h82ha";
-const UPLOAD_PRESET = "curso_portada";
+import React, { useState, useEffect } from 'react';
 
 const FormularioDiplomado = ({ show, diplomadoEditado, onClose, onSave }) => {
   const [formData, setFormData] = useState({
-    titulo: '', subtitulo: '', descripcion: '', precio: '0',
-    esGratis: false, esPremioTorneo: false, duracion: '10 horas',
-    totalLecciones: '0 lecciones', totalModulos: '0 módulos',
-    incluyeConstancia: 'Constancia incluida', imagenUrl: '', modulos: []
+    titulo: '',
+    descripcion: '',
+    imagen: '',
+    duracion: '160 horas',
+    precio: 0,
+    esPremioTorneo: false,
+    modulos: []
   });
-  
-  const [imagenFile, setImagenFile] = useState(null);
-  const [imagenPreview, setImagenPreview] = useState('');
-  const [subiendo, setSubiendo] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+
+  const [modulos, setModulos] = useState([]);
+  const [moduloActual, setModuloActual] = useState({ titulo: '', lecciones: [] });
+  const [leccionActual, setLeccionActual] = useState({ titulo: '', contenido: '', videoUrl: '' });
 
   useEffect(() => {
     if (diplomadoEditado) {
       setFormData({
         titulo: diplomadoEditado.titulo || '',
-        subtitulo: diplomadoEditado.subtitulo || '',
         descripcion: diplomadoEditado.descripcion || '',
-        precio: diplomadoEditado.precio?.toString() || '0',
-        esGratis: diplomadoEditado.esGratis || false,
+        imagen: diplomadoEditado.imagen || '',
+        duracion: diplomadoEditado.duracion || '160 horas',
+        precio: diplomadoEditado.precio || 0,
         esPremioTorneo: diplomadoEditado.esPremioTorneo || false,
-        duracion: diplomadoEditado.duracion || '10 horas',
-        totalLecciones: diplomadoEditado.totalLecciones || '0 lecciones',
-        totalModulos: diplomadoEditado.totalModulos || '0 módulos',
-        incluyeConstancia: diplomadoEditado.incluyeConstancia || 'Constancia incluida',
-        imagenUrl: diplomadoEditado.imagenUrl || '',
-        modulos: diplomadoEditado.modulos ? JSON.parse(JSON.stringify(diplomadoEditado.modulos)) : []
+        modulos: diplomadoEditado.modulos || []
       });
-      setImagenPreview(diplomadoEditado.imagenUrl || '');
+      setModulos(diplomadoEditado.modulos || []);
     } else {
       setFormData({
-        titulo: '', subtitulo: '', descripcion: '', precio: '0',
-        esGratis: false, esPremioTorneo: false, duracion: '10 horas',
-        totalLecciones: '0 lecciones', totalModulos: '0 módulos',
-        incluyeConstancia: 'Constancia incluida', imagenUrl: '', modulos: []
+        titulo: '',
+        descripcion: '',
+        imagen: '',
+        duracion: '160 horas',
+        precio: 0,
+        esPremioTorneo: false,
+        modulos: []
       });
-      setImagenPreview('');
+      setModulos([]);
     }
-    setImagenFile(null);
-    setError('');
   }, [diplomadoEditado]);
 
-  const handleImagenChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        alert('Solo se permiten imágenes');
-        return;
-      }
-      if (file.size > 2 * 1024 * 1024) {
-        alert('La imagen no debe superar los 2MB');
-        return;
-      }
-      setImagenFile(file);
-      setImagenPreview(URL.createObjectURL(file));
+  const agregarModulo = () => {
+    if (moduloActual.titulo.trim()) {
+      setModulos([...modulos, { ...moduloActual, id: Date.now() }]);
+      setModuloActual({ titulo: '', lecciones: [] });
     }
   };
 
-  const subirImagenCloudinary = async (file) => {
-    setSubiendo(true);
-    const formDataCloud = new FormData();
-    formDataCloud.append('file', file);
-    formDataCloud.append('upload_preset', UPLOAD_PRESET);
-    
-    try {
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
-        method: 'POST',
-        body: formDataCloud
+  const eliminarModulo = (index) => {
+    const nuevos = [...modulos];
+    nuevos.splice(index, 1);
+    setModulos(nuevos);
+  };
+
+  const agregarLeccion = () => {
+    if (leccionActual.titulo.trim()) {
+      setModuloActual({
+        ...moduloActual,
+        lecciones: [...moduloActual.lecciones, { ...leccionActual, id: Date.now() }]
       });
-      const data = await response.json();
-      if (data.secure_url) {
-        return data.secure_url;
-      } else {
-        throw new Error(data.error?.message || 'Error al subir');
-      }
-    } catch (err) {
-      console.error('Error Cloudinary:', err);
-      setError('Error al subir la imagen: ' + err.message);
-      return null;
-    } finally {
-      setSubiendo(false);
+      setLeccionActual({ titulo: '', contenido: '', videoUrl: '' });
     }
   };
 
-  const handleSubmit = async () => {
+  const eliminarLeccion = (index) => {
+    const nuevas = [...moduloActual.lecciones];
+    nuevas.splice(index, 1);
+    setModuloActual({ ...moduloActual, lecciones: nuevas });
+  };
+
+  const handleSubmit = () => {
     if (!formData.titulo) {
-      alert('Completa el título');
+      alert('El título es obligatorio');
       return;
     }
-    
-    setSaving(true);
-    setError('');
-    const diplomadoId = diplomadoEditado ? diplomadoEditado.id : Date.now().toString();
-    
-    try {
-      let imagenUrl = formData.imagenUrl;
-      if (imagenFile) {
-        const cloudinaryUrl = await subirImagenCloudinary(imagenFile);
-        if (cloudinaryUrl) {
-          imagenUrl = cloudinaryUrl;
-        } else {
-          setSaving(false);
-          return;
-        }
-      }
-      
-      const nuevoDiplomado = {
-        ...formData,
-        imagenUrl: imagenUrl,
-        totalLecciones: formData.modulos.reduce((acc, m) => acc + (m.leccionesLista?.length || 0), 0) + ' lecciones',
-        totalModulos: formData.modulos.length + ' módulos',
-      };
-      
-      await onSave(nuevoDiplomado, diplomadoId);
-      onClose();
-    } catch (err) {
-      setError('Error al guardar: ' + err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const agregarModulo = () => {
-    const nuevoId = formData.modulos.length + 1;
-    setFormData({
-      ...formData,
-      modulos: [...formData.modulos, {
-        id: nuevoId, titulo: `Módulo ${nuevoId}`, categoria: 'General', lecciones: '0 lecciones', leccionesLista: []
-      }]
-    });
-  };
-
-  const eliminarModulo = (moduloId) => {
-    if (window.confirm('¿Eliminar este módulo?')) {
-      setFormData({
-        ...formData,
-        modulos: formData.modulos.filter(m => m.id !== moduloId)
-      });
-    }
-  };
-
-  const agregarLeccion = (moduloId) => {
-    const idx = formData.modulos.findIndex(m => m.id === moduloId);
-    if (idx !== -1) {
-      const nuevoId = (formData.modulos[idx].leccionesLista?.length || 0) + 1;
-      const nuevas = [...(formData.modulos[idx].leccionesLista || []), {
-        id: nuevoId, titulo: `Lección ${nuevoId}`,
-        contenido: 'Contenido de la lección', ejemplo: 'Ejemplo práctico', caso: 'Caso ilustrativo'
-      }];
-      const nuevosModulos = [...formData.modulos];
-      nuevosModulos[idx].lecciones = `${nuevas.length} lecciones`;
-      nuevosModulos[idx].leccionesLista = nuevas;
-      setFormData({ ...formData, modulos: nuevosModulos });
-    }
-  };
-
-  const eliminarLeccion = (moduloId, leccionId) => {
-    const idx = formData.modulos.findIndex(m => m.id === moduloId);
-    if (idx !== -1) {
-      const nuevas = (formData.modulos[idx].leccionesLista || []).filter(l => l.id !== leccionId);
-      const nuevosModulos = [...formData.modulos];
-      nuevosModulos[idx].lecciones = `${nuevas.length} lecciones`;
-      nuevosModulos[idx].leccionesLista = nuevas;
-      setFormData({ ...formData, modulos: nuevosModulos });
-    }
-  };
-
-  const actualizarLeccion = (moduloId, leccionId, campo, valor) => {
-    const idx = formData.modulos.findIndex(m => m.id === moduloId);
-    if (idx !== -1) {
-      const lecIdx = (formData.modulos[idx].leccionesLista || []).findIndex(l => l.id === leccionId);
-      if (lecIdx !== -1) {
-        const nuevosModulos = [...formData.modulos];
-        nuevosModulos[idx].leccionesLista[lecIdx][campo] = valor;
-        setFormData({ ...formData, modulos: nuevosModulos });
-      }
-    }
+    onSave({ ...formData, modulos }, diplomadoEditado?.id);
   };
 
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="bg-gradient-to-r from-slate-800 to-slate-700 p-4 sticky top-0">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="bg-gradient-to-r from-purple-800 to-purple-700 p-4 rounded-t-2xl sticky top-0">
           <h2 className="text-xl font-bold text-white">{diplomadoEditado ? 'Editar Diplomado' : 'Nuevo Diplomado'}</h2>
         </div>
-        
+
         <div className="p-5 space-y-4">
-          {error && <div className="bg-red-100 text-red-700 p-2 rounded">{error}</div>}
-          
-          <div className="border rounded-lg p-3 bg-gray-50">
-            <label className="block text-sm font-bold mb-2">Imagen de portada (Cloudinary)</label>
-            {imagenPreview ? (
-              <div className="mb-3 relative inline-block">
-                <img src={imagenPreview} alt="Vista previa" className="w-32 h-32 object-cover rounded-lg border-2 border-amber-300" />
-                <button type="button" onClick={() => { setImagenFile(null); setImagenPreview(''); setFormData({...formData, imagenUrl: ''}); }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs">×</button>
-              </div>
-            ) : (
-              <div className="mb-3 w-32 h-32 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 border">Sin imagen</div>
-            )}
-            <input type="file" accept="image/*" onChange={handleImagenChange} className="text-sm" />
-            <p className="text-xs text-gray-400 mt-1">JPG, PNG (Max 2MB) - Subida a Cloudinary</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <input type="text" placeholder="Título *" value={formData.titulo} onChange={e => setFormData({...formData, titulo: e.target.value})} className="p-2 border rounded" />
-            <input type="text" placeholder="Subtítulo" value={formData.subtitulo} onChange={e => setFormData({...formData, subtitulo: e.target.value})} className="p-2 border rounded" />
-          </div>
-          <textarea placeholder="Descripción" rows="3" value={formData.descripcion} onChange={e => setFormData({...formData, descripcion: e.target.value})} className="w-full p-2 border rounded" />
-          
-          <div className="grid grid-cols-3 gap-3">
-            <input type="number" placeholder="Precio" value={formData.precio} onChange={e => setFormData({...formData, precio: e.target.value})} className="p-2 border rounded" />
-            <input type="text" placeholder="Duración" value={formData.duracion} onChange={e => setFormData({...formData, duracion: e.target.value})} className="p-2 border rounded" />
-            <input type="text" placeholder="Incluye" value={formData.incluyeConstancia} onChange={e => setFormData({...formData, incluyeConstancia: e.target.value})} className="p-2 border rounded" />
-          </div>
-          
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2"><input type="checkbox" checked={formData.esGratis} onChange={e => setFormData({...formData, esGratis: e.target.checked})} /> Gratis</label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={formData.esPremioTorneo} onChange={e => setFormData({...formData, esPremioTorneo: e.target.checked})} /> Premio Torneo</label>
-          </div>
-
-          <div className="border-t pt-4">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="font-bold">📚 Módulos ({formData.modulos.length})</h3>
-              <button onClick={agregarModulo} className="bg-green-500 text-white px-3 py-1 rounded-lg text-sm">+ Agregar Módulo</button>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold">Título *</label>
+              <input type="text" value={formData.titulo} onChange={(e) => setFormData({...formData, titulo: e.target.value})} className="w-full px-3 py-2 text-sm border rounded-lg" />
             </div>
-            
-            {formData.modulos.map((modulo, idx) => (
-              <div key={modulo.id} className="border rounded-xl p-3 mb-3 bg-gray-50">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="flex gap-2 flex-1">
-                    <input type="text" className="font-bold text-sm border rounded px-2 py-1 w-1/2" value={modulo.titulo} onChange={e => { const n = [...formData.modulos]; n[idx].titulo = e.target.value; setFormData({...formData, modulos: n}); }} />
-                    <input type="text" className="text-sm border rounded px-2 py-1 w-1/2" placeholder="Categoría" value={modulo.categoria} onChange={e => { const n = [...formData.modulos]; n[idx].categoria = e.target.value; setFormData({...formData, modulos: n}); }} />
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => agregarLeccion(modulo.id)} className="text-green-600 text-sm">+ Lección</button>
-                    <button onClick={() => eliminarModulo(modulo.id)} className="text-red-500 text-sm">Eliminar</button>
-                  </div>
+            <div>
+              <label className="block text-xs font-bold">Duración</label>
+              <input type="text" value={formData.duracion} onChange={(e) => setFormData({...formData, duracion: e.target.value})} className="w-full px-3 py-2 text-sm border rounded-lg" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold">Descripción</label>
+            <textarea rows="3" value={formData.descripcion} onChange={(e) => setFormData({...formData, descripcion: e.target.value})} className="w-full px-3 py-2 text-sm border rounded-lg" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold">URL de imagen</label>
+              <input type="url" value={formData.imagen} onChange={(e) => setFormData({...formData, imagen: e.target.value})} className="w-full px-3 py-2 text-sm border rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold">Precio (MXN)</label>
+              <input type="number" value={formData.precio} onChange={(e) => setFormData({...formData, precio: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border rounded-lg" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={formData.esPremioTorneo} onChange={(e) => setFormData({...formData, esPremioTorneo: e.target.checked})} />
+              Marcar como Premio del Torneo
+            </label>
+          </div>
+
+          {/* Módulos */}
+          <div className="border-t pt-4">
+            <h3 className="text-md font-bold mb-3">Módulos del Diplomado</h3>
+            {modulos.map((modulo, idx) => (
+              <div key={modulo.id} className="bg-gray-50 rounded-lg p-3 mb-3">
+                <div className="flex justify-between">
+                  <span className="font-bold">📚 {modulo.titulo}</span>
+                  <button onClick={() => eliminarModulo(idx)} className="text-red-500 text-xs">Eliminar</button>
                 </div>
-                {(modulo.leccionesLista || []).map((leccion, lecIdx) => (
-                  <div key={leccion.id} className="bg-white rounded-lg p-2 mt-2 border">
-                    <input type="text" className="font-semibold text-sm w-full mb-1 p-1 border rounded" value={leccion.titulo} onChange={e => actualizarLeccion(modulo.id, leccion.id, 'titulo', e.target.value)} />
-                    <textarea className="text-xs w-full p-1 border rounded mb-1" rows="2" placeholder="Contenido" value={leccion.contenido} onChange={e => actualizarLeccion(modulo.id, leccion.id, 'contenido', e.target.value)} />
-                    <div className="grid grid-cols-2 gap-1">
-                      <textarea className="text-xs p-1 border rounded" rows="1" placeholder="Ejemplo" value={leccion.ejemplo} onChange={e => actualizarLeccion(modulo.id, leccion.id, 'ejemplo', e.target.value)} />
-                      <textarea className="text-xs p-1 border rounded" rows="1" placeholder="Caso" value={leccion.caso} onChange={e => actualizarLeccion(modulo.id, leccion.id, 'caso', e.target.value)} />
-                    </div>
-                    <button onClick={() => eliminarLeccion(modulo.id, leccion.id)} className="text-red-400 text-xs mt-1">🗑️ Lección</button>
-                  </div>
-                ))}
+                <div className="pl-4 text-xs text-gray-600">
+                  {modulo.lecciones?.length || 0} lecciones
+                </div>
               </div>
             ))}
+
+            <div className="bg-purple-50 rounded-lg p-3">
+              <h4 className="text-sm font-bold mb-2">Agregar Módulo</h4>
+              <input type="text" placeholder="Nombre del módulo" value={moduloActual.titulo} onChange={(e) => setModuloActual({...moduloActual, titulo: e.target.value})} className="w-full px-3 py-2 text-sm border rounded-lg mb-2" />
+              
+              {moduloActual.lecciones.length > 0 && (
+                <div className="bg-white rounded p-2 mb-2">
+                  {moduloActual.lecciones.map((lec, i) => (
+                    <div key={lec.id} className="flex justify-between text-xs py-1">
+                      <span>📖 {lec.titulo}</span>
+                      <button onClick={() => eliminarLeccion(i)} className="text-red-500">✖</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <input type="text" placeholder="Título lección" value={leccionActual.titulo} onChange={(e) => setLeccionActual({...leccionActual, titulo: e.target.value})} className="px-2 py-1 text-sm border rounded" />
+                <input type="text" placeholder="URL video" value={leccionActual.videoUrl} onChange={(e) => setLeccionActual({...leccionActual, videoUrl: e.target.value})} className="px-2 py-1 text-sm border rounded" />
+              </div>
+              <textarea placeholder="Contenido" rows="2" value={leccionActual.contenido} onChange={(e) => setLeccionActual({...leccionActual, contenido: e.target.value})} className="w-full px-2 py-1 text-sm border rounded mb-2" />
+              
+              <button onClick={agregarLeccion} className="bg-green-500 text-white px-3 py-1 rounded text-xs">+ Agregar Lección</button>
+              <button onClick={agregarModulo} className="bg-purple-500 text-white px-3 py-1 rounded text-xs ml-2">+ Guardar Módulo</button>
+            </div>
           </div>
         </div>
-        
+
         <div className="flex justify-end gap-3 p-4 border-t">
           <button onClick={onClose} className="px-4 py-2 border rounded-lg">Cancelar</button>
-          <button onClick={handleSubmit} disabled={saving || subiendo} className="px-4 py-2 bg-amber-500 text-white rounded-lg disabled:opacity-50">
-            {saving || subiendo ? 'Guardando...' : 'Guardar Diplomado'}
-          </button>
+          <button onClick={handleSubmit} className="px-4 py-2 bg-purple-500 text-white rounded-lg">Guardar</button>
         </div>
       </div>
     </div>

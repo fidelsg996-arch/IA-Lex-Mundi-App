@@ -265,14 +265,19 @@ const Expedientes = () => {
 
   return (
     <div className="px-4">
-      {/* Portada */}
+      {/* Portada con imagen LOCAL de expedientes */}
       <div className="relative rounded-2xl overflow-hidden shadow-lg mb-6">
         <div className="absolute inset-0 bg-gradient-to-r from-slate-900 to-slate-700"></div>
         <img 
-          src="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?q=80&w=2070&auto=format&fit=crop" 
-          alt="Gestión de expedientes"
-          className="w-full h-32 object-cover opacity-30"
+          src="/expedientes.jpg"
+          alt="Gestión de expedientes judiciales"
+          className="w-full h-32 object-cover opacity-40"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?q=80&w=2070&auto=format&fit=crop';
+          }}
         />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
         <div className="relative z-10 p-4 text-white">
           <div className="flex items-center gap-3 mb-1">
             <span className="material-symbols-outlined text-4xl text-amber-400">folder_open</span>

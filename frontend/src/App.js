@@ -22,10 +22,13 @@ import GestorJuridico from './pages/GestorJuridico';
 import GuiaTramites from './pages/GuiaTramites';
 import Legislacion from './pages/Legislacion';
 import QuizLegal from './pages/QuizLegal';
-import Libros from './pages/Libros';
+
+// ✅ IMPORTACIONES CORREGIDAS
+import Libros from './pages/Libros/Libros';
 import Cursos from './pages/Cursos/Cursos';
 import CursoDetalle from './pages/Cursos/CursoDetalle';
 import Diplomados from './pages/Diplomados/Diplomados';
+
 import Torneos from './pages/Torneos/Torneos';
 import ReclamarPremio from './pages/ReclamarPremio';
 import Herramientas from './pages/Herramientas';

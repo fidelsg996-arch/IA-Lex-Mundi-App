@@ -1,105 +1,46 @@
-// src/pages/Cursos/hooks/useCursosData.js
 import { useState, useEffect } from 'react';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../../firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
-import { useAuth } from '../../../context/AuthContext';
 
 export const useCursosData = () => {
-  const { user } = useAuth();
   const [cursos, setCursos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [progresoCache, setProgresoCache] = useState({});
-
-  const getUserKey = () => {
-    if (!user || !user.email) return null;
-    return user.email.replace(/\./g, '_');
-  };
 
   const cargarCursos = async () => {
     try {
       setLoading(true);
-      const querySnapshot = await getDocs(collection(db, "cursos"));
-      const cursosFirebase = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setCursos(cursosFirebase);
-      await cargarProgresoUsuario();
+      const querySnapshot = await getDocs(collection(db, 'cursos'));
+      const cursosData = [];
+      querySnapshot.forEach((doc) => {
+        cursosData.push({ id: doc.id, ...doc.data() });
+      });
+      setCursos(cursosData);
     } catch (error) {
-      console.error("Error cargando cursos:", error);
+      console.error('Error cargando cursos:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const cargarProgresoUsuario = async () => {
-    const userKey = getUserKey();
-    if (!userKey) return {};
-    
+  const guardarCurso = async (cursoData, cursoId) => {
     try {
-      const progresoRef = doc(db, 'progreso_usuarios', userKey);
-      const progresoSnap = await getDoc(progresoRef);
-      if (progresoSnap.exists()) {
-        const data = progresoSnap.data();
-        setProgresoCache(data.leccionesCompletadas || {});
+      const cursoParaGuardar = {
+        titulo: cursoData.titulo || '',
+        descripcion: cursoData.descripcion || '',
+        imagen: cursoData.imagen || '',
+        nivel: cursoData.nivel || 'Intermedio',
+        duracion: cursoData.duracion || '',
+        precio: cursoData.precio || 0,
+        esPremioTorneo: cursoData.esPremioTorneo || false,
+        estructura: cursoData.estructura || []
+      };
+
+      if (cursoId) {
+        await updateDoc(doc(db, 'cursos', cursoId), cursoParaGuardar);
       } else {
-        setProgresoCache({});
+        await addDoc(collection(db, 'cursos'), cursoParaGuardar);
       }
-    } catch (error) {
-      console.error('Error cargando progreso:', error);
-    }
-  };
-
-  const guardarProgreso = async (cursoId, moduloId, leccionId) => {
-    const userKey = getUserKey();
-    if (!userKey) return false;
-
-    try {
-      const key = `${cursoId}|${moduloId}|${leccionId}`;
-      if (progresoCache[key]) return true;
-      
-      const nuevosCompletados = { ...progresoCache, [key]: true };
-      const progresoRef = doc(db, 'progreso_usuarios', userKey);
-      
-      await setDoc(progresoRef, {
-        userId: userKey,
-        userEmail: user.email,
-        lastUpdated: new Date().toISOString(),
-        leccionesCompletadas: nuevosCompletados
-      }, { merge: true });
-      
-      setProgresoCache(nuevosCompletados);
-      return true;
-    } catch (error) {
-      console.error('Error guardando progreso:', error);
-      return false;
-    }
-  };
-
-  const estaCompletada = (cursoId, moduloId, leccionId) => {
-    const key = `${cursoId}|${moduloId}|${leccionId}`;
-    return !!progresoCache[key];
-  };
-
-  const calcularProgresoCurso = (curso) => {
-    if (!curso || !curso.modulos) return 0;
-    let total = 0, completadas = 0;
-    curso.modulos.forEach(modulo => {
-      const lecciones = modulo.leccionesLista || [];
-      total += lecciones.length;
-      lecciones.forEach(leccion => {
-        if (estaCompletada(curso.id, modulo.id, leccion.id)) completadas++;
-      });
-    });
-    return total > 0 ? Math.round((completadas / total) * 100) : 0;
-  };
-
-  const guardarCurso = async (curso, cursoId) => {
-    try {
-      const cursoRef = doc(db, 'cursos', cursoId);
-      await setDoc(cursoRef, { ...curso, id: cursoId });
       await cargarCursos();
-      return true;
     } catch (error) {
       console.error('Error guardando curso:', error);
       throw error;
@@ -107,31 +48,83 @@ export const useCursosData = () => {
   };
 
   const eliminarCurso = async (cursoId) => {
-    const cursoRef = doc(db, 'cursos', cursoId);
-    await deleteDoc(cursoRef);
-    await cargarCursos();
+    try {
+      await deleteDoc(doc(db, 'cursos', cursoId));
+      await cargarCursos();
+    } catch (error) {
+      console.error('Error eliminando curso:', error);
+    }
   };
 
-  const actualizarPremioTorneo = async (cursoId, cursoActual) => {
-    const cursoRef = doc(db, 'cursos', cursoId);
-    await setDoc(cursoRef, { ...cursoActual, id: cursoId }, { merge: true });
-    await cargarCursos();
+  const actualizarPremioTorneo = async (cursoId, valorActual) => {
+    try {
+      await updateDoc(doc(db, 'cursos', cursoId), {
+        esPremioTorneo: !valorActual
+      });
+      await cargarCursos();
+    } catch (error) {
+      console.error('Error actualizando premio:', error);
+    }
+  };
+
+  const guardarProgreso = async (cursoId, moduloId, leccionId) => {
+    const key = `progreso_${cursoId}`;
+    const progresoActual = JSON.parse(localStorage.getItem(key) || '[]');
+    if (!progresoActual.includes(`${moduloId}_${leccionId}`)) {
+      progresoActual.push(`${moduloId}_${leccionId}`);
+      localStorage.setItem(key, JSON.stringify(progresoActual));
+    }
+  };
+
+  const estaCompletada = (cursoId, moduloId, leccionId) => {
+    const key = `progreso_${cursoId}`;
+    const progreso = JSON.parse(localStorage.getItem(key) || '[]');
+    return progreso.includes(`${moduloId}_${leccionId}`);
+  };
+
+  const calcularProgresoCurso = (cursoId) => {
+    const curso = cursos.find(c => c.id === cursoId);
+    if (!curso || !curso.estructura) return 0;
+    
+    let totalLecciones = 0;
+    let leccionesCompletadas = 0;
+    const key = `progreso_${cursoId}`;
+    const progreso = JSON.parse(localStorage.getItem(key) || '[]');
+    
+    const contar = (items) => {
+      items.forEach(item => {
+        if (item.lecciones) {
+          item.lecciones.forEach(leccion => {
+            totalLecciones++;
+            if (progreso.includes(`${item.id}_${leccion.id}`)) leccionesCompletadas++;
+          });
+        }
+        if (item.subcapitulos) contar(item.subcapitulos);
+        if (item.capitulos) contar(item.capitulos);
+      });
+    };
+    
+    curso.estructura.forEach(modulo => {
+      if (modulo.capitulos) contar(modulo.capitulos);
+      if (modulo.lecciones) contar(modulo.lecciones);
+    });
+    
+    return totalLecciones === 0 ? 0 : Math.round((leccionesCompletadas / totalLecciones) * 100);
   };
 
   useEffect(() => {
     cargarCursos();
-  }, [user?.email]);
+  }, []);
 
-  return { 
-    cursos, 
-    loading, 
-    cargarCursos, 
-    guardarCurso, 
-    eliminarCurso, 
+  return {
+    cursos,
+    loading,
+    guardarCurso,
+    eliminarCurso,
     actualizarPremioTorneo,
+    cargarCursos,
     guardarProgreso,
     estaCompletada,
-    calcularProgresoCurso,
-    progresoCache
+    calcularProgresoCurso
   };
 };

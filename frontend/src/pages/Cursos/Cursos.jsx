@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useCursosData } from './hooks/useCursosData';
-import ModalAdminLogin from '../../components/ModalAdminLogin';
-import ListaCursosPhase from './phases/ListaCursosPhase';
+import ListaCursosPhase from './components/ListaCursosPhase';
 import CursoDetallePhase from './phases/CursoDetallePhase';
 import ModuloPhase from './phases/ModuloPhase';
 import LeccionPhase from './phases/LeccionPhase';
 import ConstanciaPhase from './phases/ConstanciaPhase';
-import FormularioCurso from './components/FormularioCurso';
+import FormularioCurso from './components/FormularioCurso';  // ✅ IMPORTACIÓN AGREGADA
+
+const ADMIN_EMAIL = 'admin@lexmundi.ia';
 
 const Cursos = () => {
   const { user } = useAuth();
@@ -28,10 +29,18 @@ const Cursos = () => {
   const [moduloActual, setModuloActual] = useState(null);
   const [leccionActual, setLeccionActual] = useState(null);
   const [modoAdmin, setModoAdmin] = useState(false);
-  const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editandoCurso, setEditandoCurso] = useState(null);
   const [mostrarConstancia, setMostrarConstancia] = useState(false);
+
+  // Detectar si el usuario es admin
+  useEffect(() => {
+    if (user && user.email === ADMIN_EMAIL) {
+      setModoAdmin(true);
+    } else {
+      setModoAdmin(false);
+    }
+  }, [user]);
 
   const verificarCompletada = (cursoId, moduloId, leccionId) => {
     return estaCompletada(cursoId, moduloId, leccionId);
@@ -45,12 +54,32 @@ const Cursos = () => {
     }
   };
 
-  const handleGuardarCurso = async (cursoData, cursoId) => {
-    await guardarCurso(cursoData, cursoId);
-    await cargarCursos();
+  const handleGuardarCurso = async (cursoData) => {
+    try {
+      const cursoParaGuardar = {
+        id: cursoData.id || Date.now(),
+        titulo: cursoData.titulo || '',
+        descripcion: cursoData.descripcion || '',
+        imagen: cursoData.imagen || '',
+        nivel: cursoData.nivel || 'Intermedio',
+        duracion: cursoData.duracion || '',
+        precio: cursoData.precio || 0,
+        esPremioTorneo: cursoData.esPremioTorneo || false,
+        estructura: cursoData.estructura || []
+      };
+      
+      await guardarCurso(cursoParaGuardar, cursoData.id);
+      await cargarCursos();
+      setShowForm(false);
+      setEditandoCurso(null);
+    } catch (error) {
+      console.error('Error al guardar curso:', error);
+      alert('Error al guardar el curso. Revisa la consola.');
+    }
   };
 
   if (loading) return <div className="text-center py-20">Cargando cursos...</div>;
+  if (!user) return <div className="text-center py-20">Cargando...</div>;
 
   if (mostrarConstancia && cursoSeleccionado) {
     return <ConstanciaPhase curso={cursoSeleccionado} user={user} onBack={() => setMostrarConstancia(false)} />;
@@ -59,6 +88,25 @@ const Cursos = () => {
   if (vista === 'cursos') {
     return (
       <>
+        {/* Portada - SOLO IMAGEN */}
+        <div className="relative rounded-2xl overflow-hidden shadow-lg mb-6">
+          <img 
+            src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=2070&auto=format&fit=crop"
+            alt="Cursos especializados"
+            className="w-full h-32 object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+          <div className="absolute bottom-4 left-4 z-10 text-white">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-4xl text-blue-300">school</span>
+              <div>
+                <h1 className="text-2xl font-black">Cursos Especializados</h1>
+                <p className="text-gray-200 text-sm">Formación jurídica práctica para profesionales</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <ListaCursosPhase 
           cursos={cursos}
           modoAdmin={modoAdmin}
@@ -67,38 +115,31 @@ const Cursos = () => {
           onTogglePremio={actualizarPremioTorneo}
           onSeleccionarCurso={(curso) => { setCursoSeleccionado(curso); setVista('curso'); }}
           onAbrirFormNuevo={() => { setEditandoCurso(null); setShowForm(true); }}
-          calcularProgreso={calcularProgresoCurso}
+          calcularProgreso={calcularProgresoCurso || (() => 0)}
         />
         
-        {!modoAdmin && (
-          <button 
-            onClick={() => setShowAdminLogin(true)} 
-            className="fixed bottom-4 right-4 bg-gray-800 text-white p-3 rounded-full shadow-lg hover:bg-gray-700 z-50 flex items-center gap-2"
-          >
-            <span className="material-symbols-outlined text-sm">admin_panel_settings</span>
-            <span className="text-sm font-semibold">Admin</span>
-          </button>
+        {/* Indicador de Admin */}
+        {modoAdmin && (
+          <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2">
+            <div className="bg-amber-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">admin_panel_settings</span>
+              <span className="text-sm font-semibold">Administrador</span>
+            </div>
+          </div>
         )}
         
-        <ModalAdminLogin 
-          show={showAdminLogin} 
-          onClose={() => setShowAdminLogin(false)}
-          onSuccess={() => {
-            setModoAdmin(true);
-            setShowAdminLogin(false);
-            alert('✅ Modo administrador activado');
-          }}
-        />
-        
-        <FormularioCurso 
-          show={showForm}
-          cursoEditado={editandoCurso}
-          onClose={() => {
-            setShowForm(false);
-            setEditandoCurso(null);
-          }}
-          onSave={handleGuardarCurso}
-        />
+        {/* Formulario de Curso */}
+        {showForm && (
+          <FormularioCurso 
+            show={showForm}
+            cursoEditado={editandoCurso}
+            onClose={() => {
+              setShowForm(false);
+              setEditandoCurso(null);
+            }}
+            onSave={handleGuardarCurso}
+          />
+        )}
       </>
     );
   }
