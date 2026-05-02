@@ -2,45 +2,48 @@ import { useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { useBilletera } from '../../../context/BilleteraContext';
 
-const PRECIOS_TORNEOS = {
-  civil: 50,
-  penal: 60,
-  laboral: 70,
-  amparo: 100,
-  default: 50
-};
-
 const PagoTorneo = ({ torneo, participante, onPagoExitoso, onVolver }) => {
   const { user } = useAuth();
-  const { saldo, pagarConBilletera } = useBilletera();
+  const { saldo, realizarPago } = useBilletera();  // ✅ Usar realizarPago
   const [procesando, setProcesando] = useState(false);
 
+  // Precio según el torneo (puedes ajustarlo)
   const obtenerPrecio = () => {
+    const precios = {
+      civil: 50,
+      penal: 60,
+      laboral: 70,
+      amparo: 100,
+      default: 50
+    };
     const tipoClave = torneo?.tipo?.toLowerCase() || 'default';
-    return PRECIOS_TORNEOS[tipoClave] || PRECIOS_TORNEOS.default;
+    return precios[tipoClave] || precios.default;
   };
 
   const precio = obtenerPrecio();
-  const tieneSaldoSuficiente = saldo >= precio;
 
   const handlePago = async () => {
-    if (!tieneSaldoSuficiente) {
+    if (saldo < precio) {
       alert(`❌ Saldo insuficiente. Necesitas $${precio} MXN. Recarga desde Mi Billetera.`);
       return;
     }
 
     setProcesando(true);
     
-    setTimeout(() => {
-      const exito = pagarConBilletera(precio, `Inscripción torneo: ${torneo?.titulo}`);
+    try {
+      const exito = await realizarPago(precio, `Inscripción torneo: ${torneo?.titulo}`);
       if (exito) {
         alert(`✅ Pago exitoso! Se descontaron $${precio} MXN de tu billetera`);
         onPagoExitoso();
       } else {
         alert('❌ Error en el pago');
       }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('❌ Error al procesar el pago');
+    } finally {
       setProcesando(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -55,21 +58,14 @@ const PagoTorneo = ({ torneo, participante, onPagoExitoso, onVolver }) => {
           <div className="text-center mb-6">
             <p className="text-3xl font-bold text-green-600">${precio} MXN</p>
             <p className="text-sm text-gray-500 mt-1">Saldo disponible: ${saldo.toLocaleString()} MXN</p>
-            <p className="text-xs text-amber-600 mt-2">💡 Gana puntos por cada recarga (10% de recompensa)</p>
+            <p className="text-xs text-gray-400 mt-2">💡 Puedes recargar saldo en "Mi Billetera"</p>
           </div>
-
-          {!tieneSaldoSuficiente && (
-            <div className="bg-yellow-50 p-3 rounded-lg mb-4">
-              <p className="text-sm text-yellow-700">Saldo insuficiente.</p>
-              <button onClick={onVolver} className="mt-2 text-blue-500 text-sm">Ir a recargar</button>
-            </div>
-          )}
 
           <div className="flex gap-3">
             <button onClick={onVolver} className="flex-1 bg-gray-200 py-2 rounded-lg">Cancelar</button>
             <button 
               onClick={handlePago} 
-              disabled={!tieneSaldoSuficiente || procesando} 
+              disabled={procesando || saldo < precio} 
               className="flex-1 bg-green-500 text-white py-2 rounded-lg font-bold disabled:opacity-50"
             >
               {procesando ? 'Procesando...' : `Pagar $${precio}`}
