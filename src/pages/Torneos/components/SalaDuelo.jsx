@@ -1,10 +1,19 @@
 import { useState, useEffect } from 'react';
 import { obtenerPreguntasParaFase } from '../data/preguntasPorFase';
+import { useAuth } from '../../../context/AuthContext';
+import { useBilletera } from '../../../context/BilleteraContext';
 
 const SalaDuelo = ({ torneo, participante, fase, onCompetenciaFinalizada, onVolver }) => {
   const TOTAL_PREGUNTAS = 15;
   const META_PUNTOS = 10;
   const TIEMPO_POR_PREGUNTA = 20;
+  const PRECIO_REINGRESO = 30; // Precio para reingresar al torneo
+
+  const { user, isAdmin } = useAuth();
+  const { saldo, pagarConBilletera } = useBilletera();
+  
+  const esSuscriptor = user?.plan === 'pro' || user?.plan === 'premium';
+  const reingresosGratis = esSuscriptor;
 
   const [buscando, setBuscando] = useState(true);
   const [rival, setRival] = useState(null);
@@ -18,6 +27,11 @@ const SalaDuelo = ({ torneo, participante, fase, onCompetenciaFinalizada, onVolv
   const [dueloTerminado, setDueloTerminado] = useState(false);
   const [tiempo, setTiempo] = useState(TIEMPO_POR_PREGUNTA);
   const [respuestaSeleccionada, setRespuestaSeleccionada] = useState(false);
+  
+  // ✅ Sistema de reingresos
+  const [mostrarModalReingreso, setMostrarModalReingreso] = useState(false);
+  const [reingresosUsados, setReingresosUsados] = useState(0);
+  const [maxReingresos] = useState(3); // Máximo 3 reingresos por torneo
 
   useEffect(() => {
     let nombreFase = 'clasificacion';
@@ -47,6 +61,54 @@ const SalaDuelo = ({ torneo, participante, fase, onCompetenciaFinalizada, onVolv
     return () => clearTimeout(timer);
   }, [tiempo, estado, dueloTerminado, respuestaSeleccionada, buscando]);
 
+  // ✅ Función para reiniciar el duelo (reingreso)
+  const reiniciarDuelo = () => {
+    setPuntuacion(0);
+    setRivalPuntuacion(0);
+    setPreguntaIndex(0);
+    setRondaActual(1);
+    setEstado('usuario');
+    setRespuestaSeleccionada(false);
+    setTiempo(TIEMPO_POR_PREGUNTA);
+    setDueloTerminado(false);
+    setMensaje('🔄 Has reingresado al torneo. ¡Suerte!');
+    setTimeout(() => setMensaje(''), 2000);
+  };
+
+  // ✅ Procesar reingreso
+  const procesarReingreso = async () => {
+    if (reingresosUsados >= maxReingresos) {
+      alert('❌ Ya no puedes reingresar más veces en este torneo');
+      setMostrarModalReingreso(false);
+      onCompetenciaFinalizada(puntuacion, false, rivalPuntuacion, rival?.nombre);
+      return;
+    }
+
+    if (reingresosGratis) {
+      // Reingreso gratuito para suscriptores
+      setReingresosUsados(reingresosUsados + 1);
+      reiniciarDuelo();
+      setMostrarModalReingreso(false);
+      alert('✅ Reingreso gratis por tu suscripción');
+    } else if (saldo >= PRECIO_REINGRESO) {
+      const exito = pagarConBilletera(PRECIO_REINGRESO, `Reingreso torneo: ${torneo?.titulo}`);
+      if (exito) {
+        setReingresosUsados(reingresosUsados + 1);
+        reiniciarDuelo();
+        setMostrarModalReingreso(false);
+        alert(`✅ Reingreso exitoso. Pagaste $${PRECIO_REINGRESO} MXN`);
+      } else {
+        alert('❌ Error al procesar el pago');
+        setMostrarModalReingreso(false);
+        onCompetenciaFinalizada(puntuacion, false, rivalPuntuacion, rival?.nombre);
+      }
+    } else {
+      alert(`❌ Saldo insuficiente para reingreso. Necesitas $${PRECIO_REINGRESO} MXN`);
+      setMostrarModalReingreso(false);
+      onCompetenciaFinalizada(puntuacion, false, rivalPuntuacion, rival?.nombre);
+    }
+  };
+
   const procesarRespuestaUsuario = (esCorrecta) => {
     const nuevaPuntuacion = puntuacion + (esCorrecta ? 1 : 0);
     setPuntuacion(nuevaPuntuacion);
@@ -73,11 +135,9 @@ const SalaDuelo = ({ torneo, participante, fase, onCompetenciaFinalizada, onVolv
     setMensaje(acierta ? `⚔️ ${rival?.nombre} acertó la pregunta` : `⚔️ ${rival?.nombre} falló la pregunta`);
     
     if (nuevaPuntuacion >= META_PUNTOS) {
+      // ✅ En lugar de terminar, preguntar si quiere reingresar
       setDueloTerminado(true);
-      setMensaje(`❌ ${rival?.nombre} alcanzó ${META_PUNTOS} puntos. Has perdido`);
-      setTimeout(() => {
-        onCompetenciaFinalizada(puntuacion, false, nuevaPuntuacion, rival?.nombre);
-      }, 1500);
+      setMostrarModalReingreso(true);
       return;
     }
     
@@ -93,11 +153,15 @@ const SalaDuelo = ({ torneo, participante, fase, onCompetenciaFinalizada, onVolv
         setTimeout(() => setMensaje(''), 1000);
       } else {
         const gano = puntuacion > nuevaPuntuacion;
-        setDueloTerminado(true);
-        setMensaje(`🏆 DUELO FINALIZADO | ${gano ? 'VICTORIA' : 'DERROTA'} | ${puntuacion} - ${nuevaPuntuacion}`);
-        setTimeout(() => {
-          onCompetenciaFinalizada(puntuacion, gano, nuevaPuntuacion, rival?.nombre);
-        }, 2000);
+        if (!gano && reingresosUsados < maxReingresos) {
+          setMostrarModalReingreso(true);
+        } else {
+          setDueloTerminado(true);
+          setMensaje(`🏆 DUELO FINALIZADO | ${gano ? 'VICTORIA' : 'DERROTA'} | ${puntuacion} - ${nuevaPuntuacion}`);
+          setTimeout(() => {
+            onCompetenciaFinalizada(puntuacion, gano, nuevaPuntuacion, rival?.nombre);
+          }, 2000);
+        }
       }
     }, 1500);
   };
@@ -125,10 +189,10 @@ const SalaDuelo = ({ torneo, participante, fase, onCompetenciaFinalizada, onVolv
     );
   }
 
-  if (dueloTerminado) return null;
+  if (dueloTerminado && !mostrarModalReingreso) return null;
 
   const pregunta = preguntas[preguntaIndex];
-  if (!pregunta) {
+  if (!pregunta && !mostrarModalReingreso) {
     return (
       <div className="px-4 max-w-2xl mx-auto">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
@@ -140,6 +204,47 @@ const SalaDuelo = ({ torneo, participante, fase, onCompetenciaFinalizada, onVolv
   }
 
   const progresoMETA = (puntuacion / META_PUNTOS) * 100;
+
+  // ✅ Modal de reingreso
+  if (mostrarModalReingreso) {
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl max-w-md w-full p-6 text-center">
+          <div className="text-6xl mb-4">💀</div>
+          <h2 className="text-2xl font-bold mb-2">¡Has perdido!</h2>
+          <p className="text-gray-600 mb-4">Tu oponente te ha superado en esta ronda.</p>
+          
+          {reingresosUsados < maxReingresos ? (
+            <>
+              <div className="bg-amber-50 rounded-xl p-4 mb-4">
+                <p className="font-bold text-amber-800">🔄 ¿Quieres reingresar?</p>
+                {reingresosGratis ? (
+                  <p className="text-sm text-green-600 mt-1">✅ Reingreso GRATIS por tu suscripción</p>
+                ) : (
+                  <p className="text-sm text-gray-600 mt-1">Costo: ${PRECIO_REINGRESO} MXN</p>
+                )}
+                <p className="text-xs text-gray-500 mt-2">Te quedan {maxReingresos - reingresosUsados} reingresos</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => {
+                  setMostrarModalReingreso(false);
+                  onCompetenciaFinalizada(puntuacion, false, rivalPuntuacion, rival?.nombre);
+                }} className="flex-1 bg-gray-200 py-2 rounded-lg">Rendirme</button>
+                <button onClick={procesarReingreso} className="flex-1 bg-amber-500 text-white py-2 rounded-lg font-bold">
+                  {reingresosGratis ? 'Reingresar gratis' : `Pagar $${PRECIO_REINGRESO} y reingresar`}
+                </button>
+              </div>
+            </>
+          ) : (
+            <button onClick={() => {
+              setMostrarModalReingreso(false);
+              onCompetenciaFinalizada(puntuacion, false, rivalPuntuacion, rival?.nombre);
+            }} className="w-full bg-red-500 text-white py-2 rounded-lg">Salir</button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 max-w-4xl mx-auto">
@@ -209,7 +314,7 @@ const SalaDuelo = ({ torneo, participante, fase, onCompetenciaFinalizada, onVolv
             </div>
             <div className="grid grid-cols-1 gap-3">
               {pregunta.opciones.map((opt, idx) => (
-                <button key={idx} onClick={() => responder(idx)} disabled={respuestaSeleccionada} className="p-3 rounded-lg text-left bg-white border border-gray-200 hover:bg-gray-100 transition">
+                <button key={idx} onClick={() => responder(idx)} disabled={respuestaSeleccionada} className="p-3 rounded-lg text-left bg-white border border-gray-200 hover:bg-gray-100 transition disabled:opacity-50">
                   {opt}
                 </button>
               ))}
@@ -225,6 +330,7 @@ const SalaDuelo = ({ torneo, participante, fase, onCompetenciaFinalizada, onVolv
           <span>📋 15 preguntas</span>
           <span>🎯 10 puntos = Victoria</span>
           <span>⚔️ Eliminación directa</span>
+          <span>🔄 Reingreso disponible</span>
           <span>📚 Nivel: {fase === 'clasificacion' ? 'Básico' : fase === 'grupos' ? 'Intermedio' : fase === 'eliminatorias' ? 'Avanzado' : 'Experto'}</span>
         </div>
       </div>

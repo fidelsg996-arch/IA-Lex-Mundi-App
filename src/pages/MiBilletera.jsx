@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useBilletera } from '../context/BilleteraContext';
 
 const MiBilletera = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { saldo, transacciones, recargarSaldo, transferir, retirar, recargaAdmin } = useBilletera();
 
   const [mostrarModalRecarga, setMostrarModalRecarga] = useState(false);
@@ -23,8 +23,7 @@ const MiBilletera = () => {
     cvv: '',
   });
 
-  // ✅ DETECCIÓN DE ADMIN POR EMAIL (funciona seguro)
-  const isAdmin = user?.email === 'admin@lexmundi.ia';
+  const esAdmin = isAdmin();
 
   const formatearFecha = (fechaISO) => {
     return new Date(fechaISO).toLocaleString('es-MX');
@@ -150,7 +149,7 @@ const MiBilletera = () => {
   };
 
   const handleRecargaAdmin = () => {
-    if (!user || !isAdmin) {
+    if (!user || !esAdmin) {
       alert('❌ Acceso denegado');
       return;
     }
@@ -186,22 +185,19 @@ const MiBilletera = () => {
       <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Mi Billetera</h1>
       <p className="text-sm md:text-base text-gray-600 mb-4 md:mb-6">Gestiona tu saldo, recarga, transfiere o retira dinero</p>
 
-      {/* Tarjeta de saldo */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl shadow-lg p-4 md:p-6 text-white mb-6 md:mb-8">
         <div className="flex justify-between items-start">
           <div>
             <p className="text-xs md:text-sm opacity-90">Saldo disponible</p>
             <p className="text-3xl md:text-5xl font-bold mt-2">${saldo.toLocaleString()} MXN</p>
           </div>
-          {isAdmin && (
-            <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full">👑 ADMIN</span>
-          )}
+          {esAdmin && <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full">👑 ADMIN</span>}
         </div>
         <div className="flex flex-wrap gap-2 md:gap-4 mt-4 md:mt-6">
           <button onClick={() => setMostrarModalRecarga(true)} className="bg-white text-blue-700 px-4 md:px-6 py-2 rounded-lg font-semibold text-sm md:text-base hover:bg-gray-100">+ Recargar</button>
           <button onClick={() => setMostrarModalTransferir(true)} className="bg-blue-500 border border-white text-white px-4 md:px-6 py-2 rounded-lg font-semibold text-sm md:text-base hover:bg-blue-400">Transferir</button>
           <button onClick={() => setMostrarModalRetirar(true)} className="bg-gray-800 text-white px-4 md:px-6 py-2 rounded-lg font-semibold text-sm md:text-base hover:bg-gray-700">Retirar</button>
-          {isAdmin && (
+          {esAdmin && (
             <button onClick={() => setMostrarModalAdminRecarga(true)} className="bg-yellow-500 text-black px-4 md:px-6 py-2 rounded-lg font-semibold text-sm md:text-base hover:bg-yellow-400">
               👑 Recarga Admin
             </button>
@@ -209,7 +205,6 @@ const MiBilletera = () => {
         </div>
       </div>
 
-      {/* Resumen rápido */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-6 mb-6 md:mb-8">
         <div className="bg-white rounded-xl shadow-md p-3 md:p-4 text-center">
           <p className="text-gray-500 text-xs md:text-sm">Total recargado</p>
@@ -225,7 +220,6 @@ const MiBilletera = () => {
         </div>
       </div>
 
-      {/* Historial */}
       <div className="bg-white rounded-xl shadow-md p-4 md:p-6">
         <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">Historial de movimientos</h2>
         {transacciones.length === 0 ? (
@@ -235,10 +229,10 @@ const MiBilletera = () => {
             <table className="min-w-[600px] md:min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                  <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                  <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
-                  <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalle</th>
+                  <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500">Fecha</th>
+                  <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500">Tipo</th>
+                  <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500">Monto</th>
+                  <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500">Detalle</th>
                 </tr>
               </thead>
               <tbody>
@@ -251,9 +245,7 @@ const MiBilletera = () => {
                         t.tipo === 'Recarga Admin' ? 'bg-yellow-100 text-yellow-800' :
                         t.tipo === 'Transferencia recibida' ? 'bg-blue-100 text-blue-800' : 
                         'bg-red-100 text-red-800'
-                      }`}>
-                        {t.tipo}
-                      </span>
+                      }`}>{t.tipo}</span>
                     </td>
                     <td className="px-3 md:px-6 py-2 md:py-4 whitespace-nowrap text-xs md:text-sm font-medium">
                       <span className={t.monto > 0 ? 'text-green-600' : 'text-red-600'}>
@@ -269,44 +261,27 @@ const MiBilletera = () => {
         )}
       </div>
 
-      {/* MODALES - se mantienen igual */}
+      {/* MODALES - simplificados para evitar errores */}
       {mostrarModalRecarga && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-4 md:p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl md:text-2xl font-bold text-center mb-4">Recargar saldo</h2>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <h2 className="text-xl font-bold text-center mb-4">Recargar saldo</h2>
             <p className="text-center text-gray-600 mb-4">Saldo actual: ${saldo.toLocaleString()} MXN</p>
-            <div className="grid grid-cols-3 gap-2 md:gap-3 mb-4">
-              {[50, 100, 200].map(m => <button key={m} onClick={() => setMonto(m)} className="p-2 md:p-3 border rounded-xl hover:bg-gray-100">${m}</button>)}
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              {[50, 100, 200].map(m => <button key={m} onClick={() => setMonto(m)} className="p-3 border rounded-xl hover:bg-gray-100">${m}</button>)}
             </div>
-            <input type="number" value={monto} onChange={(e) => setMonto(parseInt(e.target.value) || 0)} placeholder="Otro monto" className="w-full p-2 md:p-3 border rounded-xl mb-4" />
+            <input type="number" value={monto} onChange={(e) => setMonto(parseInt(e.target.value) || 0)} placeholder="Otro monto" className="w-full p-3 border rounded-xl mb-4" />
             <div className="border-t pt-4 mt-2">
-              <p className="font-semibold mb-3">Datos de pago (simulación)</p>
-              <input type="text" placeholder="Número de tarjeta (16 dígitos)" value={datosPago.numeroTarjeta} onChange={(e) => setDatosPago({...datosPago, numeroTarjeta: e.target.value.replace(/\D/g, '').slice(0,16)})} maxLength={16} className="w-full p-2 md:p-3 border rounded-xl mb-3" />
-              <div className="grid grid-cols-2 gap-2 md:gap-3">
-                <input type="text" placeholder="MM/AA" value={datosPago.fechaExpiracion} onChange={(e) => {
-                  let value = e.target.value.replace(/\D/g, '');
-                  if (value.length > 4) value = value.slice(0, 4);
-                  if (value.length >= 2) {
-                    const mes = parseInt(value.slice(0, 2));
-                    if (mes > 12 && mes <= 99) {
-                      alert("❌ El mes debe ser entre 01 y 12");
-                      return;
-                    }
-                  }
-                  if (value.length >= 3) {
-                    value = value.slice(0, 2) + '/' + value.slice(2);
-                  }
-                  setDatosPago({...datosPago, fechaExpiracion: value});
-                }} maxLength={5} className="w-full p-2 md:p-3 border rounded-xl" />
-                <input type="text" placeholder="CVV" value={datosPago.cvv} onChange={(e) => {
-                  let value = e.target.value.replace(/\D/g, '').slice(0, 3);
-                  setDatosPago({...datosPago, cvv: value});
-                }} maxLength={3} className="w-full p-2 md:p-3 border rounded-xl" />
+              <p className="font-semibold mb-3">Datos de pago</p>
+              <input type="text" placeholder="Número de tarjeta (16 dígitos)" value={datosPago.numeroTarjeta} onChange={(e) => setDatosPago({...datosPago, numeroTarjeta: e.target.value.replace(/\D/g, '').slice(0,16)})} maxLength={16} className="w-full p-3 border rounded-xl mb-3" />
+              <div className="grid grid-cols-2 gap-3">
+                <input type="text" placeholder="MM/AA" value={datosPago.fechaExpiracion} onChange={(e) => setDatosPago({...datosPago, fechaExpiracion: e.target.value})} maxLength={5} className="w-full p-3 border rounded-xl" />
+                <input type="text" placeholder="CVV" value={datosPago.cvv} onChange={(e) => setDatosPago({...datosPago, cvv: e.target.value.replace(/\D/g, '').slice(0,3)})} maxLength={3} className="w-full p-3 border rounded-xl" />
               </div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setMostrarModalRecarga(false)} className="flex-1 bg-gray-200 py-2 md:py-3 rounded-xl">Cancelar</button>
-              <button onClick={handleRecarga} disabled={procesando || monto <= 0} className="flex-1 bg-green-500 text-white py-2 md:py-3 rounded-xl font-bold disabled:opacity-50">{procesando ? 'Procesando...' : 'Pagar y recargar'}</button>
+              <button onClick={() => setMostrarModalRecarga(false)} className="flex-1 bg-gray-200 py-3 rounded-xl">Cancelar</button>
+              <button onClick={handleRecarga} disabled={procesando || monto <= 0} className="flex-1 bg-green-500 text-white py-3 rounded-xl font-bold disabled:opacity-50">{procesando ? 'Procesando...' : 'Pagar'}</button>
             </div>
           </div>
         </div>
@@ -314,33 +289,15 @@ const MiBilletera = () => {
 
       {mostrarModalTransferir && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-4 md:p-6">
-            <h2 className="text-xl md:text-2xl font-bold text-center mb-4">Transferir saldo</h2>
-            <p className="text-center text-gray-600 mb-4">Saldo disponible: ${saldo.toLocaleString()} MXN</p>
-            <input type="email" value={emailDestino} onChange={(e) => setEmailDestino(e.target.value)} placeholder="Email del destinatario" className="w-full p-2 md:p-3 border rounded-xl mb-3" />
-            <input type="number" value={monto} onChange={(e) => setMonto(parseInt(e.target.value) || 0)} placeholder="Monto a transferir" className="w-full p-2 md:p-3 border rounded-xl mb-3" />
-            <input type="text" value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Concepto (opcional)" className="w-full p-2 md:p-3 border rounded-xl mb-4" />
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <h2 className="text-xl font-bold text-center mb-4">Transferir saldo</h2>
+            <p className="text-center text-gray-600 mb-4">Saldo: ${saldo.toLocaleString()} MXN</p>
+            <input type="email" value={emailDestino} onChange={(e) => setEmailDestino(e.target.value)} placeholder="Email del destinatario" className="w-full p-3 border rounded-xl mb-3" />
+            <input type="number" value={monto} onChange={(e) => setMonto(parseInt(e.target.value) || 0)} placeholder="Monto" className="w-full p-3 border rounded-xl mb-3" />
+            <input type="text" value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Concepto" className="w-full p-3 border rounded-xl mb-4" />
             <div className="flex gap-3">
-              <button onClick={() => setMostrarModalTransferir(false)} className="flex-1 bg-gray-200 py-2 md:py-3 rounded-xl">Cancelar</button>
-              <button onClick={handleTransferir} disabled={procesando || monto <= 0 || monto > saldo} className="flex-1 bg-blue-500 text-white py-2 md:py-3 rounded-xl font-bold disabled:opacity-50">{procesando ? 'Procesando...' : 'Transferir'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {mostrarModalRetirar && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-4 md:p-6">
-            <h2 className="text-xl md:text-2xl font-bold text-center mb-4">Retirar saldo</h2>
-            <p className="text-center text-gray-600 mb-4">Saldo disponible: ${saldo.toLocaleString()} MXN</p>
-            <p className="text-sm text-gray-500 mb-2">Monto a retirar (mínimo $100)</p>
-            <input type="number" value={monto} onChange={(e) => setMonto(parseInt(e.target.value) || 0)} placeholder="Monto" className="w-full p-2 md:p-3 border rounded-xl mb-4" />
-            <div className="text-xs md:text-sm text-gray-500 mb-4">
-              <p>Los retiros se procesan en 24-48 horas a tu cuenta bancaria registrada.</p>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setMostrarModalRetirar(false)} className="flex-1 bg-gray-200 py-2 md:py-3 rounded-xl">Cancelar</button>
-              <button onClick={handleRetirar} disabled={procesando || monto < 100 || monto > saldo} className="flex-1 bg-yellow-600 text-white py-2 md:py-3 rounded-xl font-bold disabled:opacity-50">{procesando ? 'Procesando...' : 'Solicitar retiro'}</button>
+              <button onClick={() => setMostrarModalTransferir(false)} className="flex-1 bg-gray-200 py-3 rounded-xl">Cancelar</button>
+              <button onClick={handleTransferir} disabled={procesando || monto <= 0 || monto > saldo} className="flex-1 bg-blue-500 text-white py-3 rounded-xl font-bold disabled:opacity-50">{procesando ? 'Procesando...' : 'Transferir'}</button>
             </div>
           </div>
         </div>
@@ -348,14 +305,13 @@ const MiBilletera = () => {
 
       {mostrarModalAdminRecarga && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-4 md:p-6">
-            <h2 className="text-xl md:text-2xl font-bold text-center mb-2">👑 Recarga Administrativa</h2>
-            <p className="text-center text-gray-600 mb-4">Añade saldo directamente (sin pago real)</p>
-            <p className="text-center text-sm text-green-600 mb-4">Saldo actual: ${saldo.toLocaleString()} MXN</p>
-            <input type="number" value={montoAdmin} onChange={(e) => setMontoAdmin(parseInt(e.target.value) || 0)} placeholder="Monto a añadir" className="w-full p-2 md:p-3 border rounded-xl mb-4" />
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <h2 className="text-xl font-bold text-center mb-2">👑 Recarga Administrativa</h2>
+            <p className="text-center text-gray-600 mb-4">Saldo actual: ${saldo.toLocaleString()} MXN</p>
+            <input type="number" value={montoAdmin} onChange={(e) => setMontoAdmin(parseInt(e.target.value) || 0)} placeholder="Monto" className="w-full p-3 border rounded-xl mb-4" />
             <div className="flex gap-3">
-              <button onClick={() => setMostrarModalAdminRecarga(false)} className="flex-1 bg-gray-200 py-2 md:py-3 rounded-xl">Cancelar</button>
-              <button onClick={handleRecargaAdmin} disabled={procesando || montoAdmin <= 0} className="flex-1 bg-yellow-500 text-black py-2 md:py-3 rounded-xl font-bold disabled:opacity-50">{procesando ? 'Procesando...' : 'Recargar'}</button>
+              <button onClick={() => setMostrarModalAdminRecarga(false)} className="flex-1 bg-gray-200 py-3 rounded-xl">Cancelar</button>
+              <button onClick={handleRecargaAdmin} disabled={procesando || montoAdmin <= 0} className="flex-1 bg-yellow-500 text-black py-3 rounded-xl font-bold disabled:opacity-50">{procesando ? 'Procesando...' : 'Recargar'}</button>
             </div>
           </div>
         </div>

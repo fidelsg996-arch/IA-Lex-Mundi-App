@@ -60,8 +60,13 @@ function App() {
                 <Route path="/legislacion" element={<Legislacion />} />
                 <Route path="/quiz-legal" element={<QuizLegal />} />
                 <Route path="/libros" element={<Libros />} />
+                
+                {/* ✅ RUTAS DE CURSOS CORREGIDAS */}
                 <Route path="/cursos" element={<Cursos />} />
+                <Route path="/cursos/nuevo" element={<CursoDetalle />} />
                 <Route path="/cursos/:id" element={<CursoDetalle />} />
+                <Route path="/cursos/:id/editar" element={<CursoDetalle />} />
+                
                 <Route path="/diplomados" element={<Diplomados />} />
                 <Route path="/torneos" element={<Torneos />} />
                 <Route path="/reclamar-premio" element={<ReclamarPremio />} />
