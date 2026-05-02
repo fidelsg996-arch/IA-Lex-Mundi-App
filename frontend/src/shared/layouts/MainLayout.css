@@ -1,0 +1,120 @@
+/* shared/layouts/MainLayout.css */
+.app-dashboard {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 280px;
+  background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.sidebar-header {
+  padding: 30px 20px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.sidebar-header h2 {
+  font-size: 24px;
+  margin-bottom: 5px;
+}
+
+.sidebar-header p {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.nav-menu {
+  flex: 1;
+  list-style: none;
+  padding: 20px 0;
+}
+
+.nav-menu li {
+  padding: 15px 25px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+}
+
+.nav-menu li:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.nav-menu li.active {
+  background: rgba(255,255,255,0.2);
+  border-left: 4px solid #ffd700;
+}
+
+.user-info {
+  padding: 20px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  text-align: center;
+}
+
+.logout-btn-sidebar {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 280px;
+  background: #f5f7fa;
+}
+
+.content-header {
+  background: white;
+  padding: 20px 30px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.content-header h1 {
+  font-size: 24px;
+  color: #333;
+}
+
+.user-welcome {
+  color: #666;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 80px;
+  }
+  
+  .sidebar-header h2, 
+  .sidebar-header p, 
+  .nav-menu li span:not(:first-child), 
+  .user-info p {
+    display: none;
+  }
+  
+  .main-content {
+    margin-left: 80px;
+  }
+  
+  .nav-menu li {
+    justify-content: center;
+    padding: 15px;
+  }
+}
