@@ -14,15 +14,50 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
   const [dueloEnCurso, setDueloEnCurso] = useState(null);
   const [dueloCompletado, setDueloCompletado] = useState(false);
   const [pagandoReingreso, setPagandoReingreso] = useState(false);
+  const [rivalesGrupo, setRivalesGrupo] = useState([]);
 
   const TOTAL_DUELOS = 3;
   const VICTORIAS_NECESARIAS = 2;
 
   useEffect(() => {
-    cargarDuelos();
+    cargarDatos();
+    cargarRivalesGrupo();
   }, []);
 
-  const cargarDuelos = () => {
+  const obtenerParticipantesGrupo = () => {
+    const participantes = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.includes(`torneo_${torneo.id}_`)) {
+        const p = JSON.parse(localStorage.getItem(key));
+        if (p.grupo === participante.grupo && p.usuarioId !== user?.uid) {
+          participantes.push(p);
+        }
+      }
+    }
+    return participantes;
+  };
+
+  const cargarRivalesGrupo = () => {
+    const rivales = obtenerParticipantesGrupo();
+    setRivalesGrupo(rivales);
+    
+    const stored = localStorage.getItem(`grupos_${torneo.id}_${participante.usuarioId}`);
+    if (!stored && rivales.length > 0) {
+      const duelosIniciales = rivales.map(rival => ({
+        id: rival.id,
+        rival: rival.nombre,
+        avatar: rival.avatar || null,
+        completado: false,
+        ganado: false,
+        puntos: 0
+      }));
+      setDuelos(duelosIniciales);
+      guardarProgreso(duelosIniciales, 0, 0, 0);
+    }
+  };
+
+  const cargarDatos = () => {
     const stored = localStorage.getItem(`grupos_${torneo.id}_${participante.usuarioId}`);
     if (stored) {
       const data = JSON.parse(stored);
@@ -30,16 +65,6 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
       setPuntajeTotal(data.puntajeTotal || 0);
       setVictorias(data.victorias || 0);
       setDueloActual(data.dueloActual || 0);
-    } else {
-      const duelosIniciales = [
-        { id: 1, rival: 'María González', completado: false, ganado: false, puntos: 0 },
-        { id: 2, rival: 'Javier Rodríguez', completado: false, ganado: false, puntos: 0 },
-        { id: 3, rival: 'Ana Martínez', completado: false, ganado: false, puntos: 0 }
-      ];
-      setDuelos(duelosIniciales);
-      setPuntajeTotal(0);
-      setVictorias(0);
-      setDueloActual(0);
     }
   };
 
@@ -51,6 +76,10 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
       dueloActual: nuevoDueloActual
     };
     localStorage.setItem(`grupos_${torneo.id}_${participante.usuarioId}`, JSON.stringify(data));
+    
+    const updated = { ...participante, duelosGrupo: nuevoDueloActual, puntajeGrupo: nuevoPuntaje, victoriasGrupo: nuevasVictorias };
+    localStorage.setItem(participante.id, JSON.stringify(updated));
+    setParticipante(updated);
   };
 
   const iniciarDuelo = () => {
@@ -141,7 +170,6 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
 
   const duelosRestantes = TOTAL_DUELOS - dueloActual;
   const victoriasNecesarias = Math.max(0, VICTORIAS_NECESARIAS - victorias);
-  const dueloEnCursoObj = dueloActual < TOTAL_DUELOS ? duelos[dueloActual] : null;
 
   if (mostrarDuelo) {
     return <SalaDuelo 
@@ -170,18 +198,18 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
         {/* Header */}
         <div className="bg-gradient-to-r from-indigo-700 to-indigo-600 p-6 text-white text-center">
           <h2 className="text-3xl md:text-4xl font-black mb-2">🏆 Fase de Grupos</h2>
-          <p className="text-xl md:text-2xl font-semibold text-indigo-200">Grupo: 13</p>
+          <p className="text-xl md:text-2xl font-semibold text-indigo-200">Grupo: {participante?.grupo || 'A'}</p>
           <div className="mt-4 flex justify-center gap-6">
             <div className="text-center">
-              <p className="text-2xl font-bold">{duelosRestantes}</p>
+              <p className="text-3xl font-bold">{duelosRestantes}</p>
               <p className="text-sm">Duelos restantes</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold">{puntajeTotal}</p>
+              <p className="text-3xl font-bold">{puntajeTotal}</p>
               <p className="text-sm">Puntaje acumulado</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-yellow-300">{victorias}</p>
+              <p className="text-3xl font-bold text-yellow-300">{victorias}</p>
               <p className="text-sm">Victorias</p>
             </div>
           </div>
@@ -190,10 +218,84 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
         <div className="p-6">
           {/* Reglas */}
           <div className="bg-indigo-50 rounded-2xl p-5 mb-8">
-            <div className="flex flex-wrap justify-between items-center text-base text-indigo-800">
-              <span className="flex items-center gap-2">⏱️ <span className="font-bold">20 segundos</span> por pregunta</span>
-              <span className="flex items-center gap-2">📋 <span className="font-bold">15 preguntas</span> por duelo</span>
-              <span className="flex items-center gap-2">🎯 <span className="font-bold">10 puntos</span> = victoria automática</span>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div className="flex flex-col items-center">
+                <span className="text-3xl mb-1">⏱️</span>
+                <span className="text-base font-bold">20 segundos</span>
+                <span className="text-xs text-gray-500">por pregunta</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-3xl mb-1">📋</span>
+                <span className="text-base font-bold">15 preguntas</span>
+                <span className="text-xs text-gray-500">por duelo</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-3xl mb-1">🎯</span>
+                <span className="text-base font-bold">10 puntos</span>
+                <span className="text-xs text-gray-500">= victoria automática</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-3xl mb-1">⚔️</span>
+                <span className="text-base font-bold">Duelos</span>
+                <span className="text-xs text-gray-500">todos contra todos</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabla de posiciones del grupo CON AVATARES */}
+          <div className="mb-8">
+            <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <span className="text-2xl">📊</span> Tabla de posiciones - Grupo {participante?.grupo || 'A'}
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full bg-white rounded-xl shadow border">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="p-3 text-left">Participante</th>
+                    <th className="p-3 text-center">Victorias</th>
+                    <th className="p-3 text-center">Puntos</th>
+                    <th className="p-3 text-center">Duelos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rivalesGrupo.map((rival, idx) => (
+                    <tr key={idx} className="border-t">
+                      <td className="p-3 font-medium">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
+                            {rival.avatar ? (
+                              <img src={rival.avatar} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="material-symbols-outlined text-gray-500 text-sm">person</span>
+                            )}
+                          </div>
+                          {rival.nombre}
+                        </div>
+                       </td>
+                      <td className="p-3 text-center">{rival.victoriasGrupo || 0}</td>
+                      <td className="p-3 text-center">{rival.puntajeGrupo || 0}</td>
+                      <td className="p-3 text-center">{rival.duelosGrupo || 0}</td>
+                     </tr>
+                  ))}
+                  <tr className="border-t bg-indigo-50">
+                    <td className="p-3 font-bold">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 overflow-hidden flex items-center justify-center">
+                          {participante?.avatar ? (
+                            <img src={participante.avatar} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="material-symbols-outlined text-white text-sm">person</span>
+                          )}
+                        </div>
+                        {participante?.nombre} (Tú)
+                      </div>
+                    </td>
+                    <td className="p-3 text-center font-bold">{victorias}</td>
+                    <td className="p-3 text-center font-bold">{puntajeTotal}</td>
+                    <td className="p-3 text-center font-bold">{dueloActual}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -208,10 +310,19 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
               <p className="text-lg text-gray-600 mb-1">Victorias necesarias: <span className="font-bold text-indigo-600">{victoriasNecesarias}</span></p>
               <p className="text-md text-gray-500 mb-6">Te quedan {duelosRestantes} duelos para alcanzar la meta</p>
               
-              {dueloEnCursoObj && (
+              {duelos[dueloActual] && (
                 <div className="bg-white rounded-xl p-4 mb-6 shadow-sm">
                   <p className="text-lg font-semibold text-gray-700">⚔️ Rival:</p>
-                  <p className="text-2xl font-bold text-indigo-600">{dueloEnCursoObj.rival}</p>
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
+                      {duelos[dueloActual].avatar ? (
+                        <img src={duelos[dueloActual].avatar} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="material-symbols-outlined text-gray-500">person</span>
+                      )}
+                    </div>
+                    <p className="text-2xl font-bold text-indigo-600">{duelos[dueloActual].rival}</p>
+                  </div>
                 </div>
               )}
               
@@ -237,35 +348,6 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
               >
                 {victorias >= VICTORIAS_NECESARIAS ? 'Continuar a Eliminatorias' : 'Volver a Torneos'}
               </button>
-            </div>
-          )}
-          
-          {/* Historial de duelos */}
-          {duelos.filter(d => d.completado).length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <span className="text-2xl">📋</span> Historial de Duelos
-              </h3>
-              <div className="space-y-3">
-                {duelos.filter(d => d.completado).map((duelo, idx) => (
-                  <div key={duelo.id} className={`p-4 rounded-xl ${duelo.ganado ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <div>
-                        <p className="font-semibold text-lg">Duelo {idx + 1} vs {duelo.rival}</p>
-                        <p className="text-sm text-gray-600">Puntuación: {duelo.puntos} pts</p>
-                      </div>
-                      <div className="text-right">
-                        <span className={`font-bold text-xl ${duelo.ganado ? 'text-green-600' : 'text-red-600'}`}>
-                          {duelo.ganado ? '🏆 Victoria' : '❌ Derrota'}
-                        </span>
-                        {duelo.puntajeRival && (
-                          <p className="text-sm text-gray-500">Rival: {duelo.puntajeRival} pts</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
         </div>
