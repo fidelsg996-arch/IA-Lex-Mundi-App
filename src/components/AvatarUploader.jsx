@@ -37,9 +37,11 @@ const AvatarUploader = ({ userId, currentAvatar, onAvatarUpdate, size = 'w-24 h-
       setAvatarUrl(url);
       if (onAvatarUpdate) onAvatarUpdate(url);
       alert('✅ Avatar actualizado correctamente');
+      return url;
     } catch (error) {
       console.error('Error subiendo avatar:', error);
       alert('❌ Error al subir la imagen');
+      return null;
     } finally {
       setUploading(false);
     }

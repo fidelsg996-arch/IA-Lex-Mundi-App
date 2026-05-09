@@ -4,10 +4,7 @@ import { db, storage } from '../../../firebase';
 import { collection, getDocs, deleteDoc, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-const STORAGE_KEY_TORNEOS = 'lexmindi_torneos';
-const STORAGE_KEY_LIBROS = 'lexmindi_libros';
-const STORAGE_KEY_CURSOS = 'lexmindi_cursos';
-const STORAGE_KEY_DIPLOMADOS = 'lexmindi_diplomados';
+const STORAGE_KEY = 'lexmindi_torneos';
 
 const torneosIniciales = [
   { 
@@ -51,178 +48,180 @@ const ListaTorneos = ({ onSeleccionarTorneo, modoAdmin: modoAdminProp }) => {
   const [editandoTorneo, setEditandoTorneo] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [subiendoImagen, setSubiendoImagen] = useState(false);
   const [formData, setFormData] = useState({
     titulo: '', descripcion: '', fecha: '', imagenPortada: '', premioDinero: '', premioTipo: 'dinero', premioId: '', premioNombre: '',
     tipo: 'Individual', status: 'activo'
   });
-
-  // Cargar torneos desde localStorage (y Firestore como respaldo)
-  const cargarTorneos = () => {
-    const stored = localStorage.getItem(STORAGE_KEY_TORNEOS);
-    if (stored) {
-      setTorneos(JSON.parse(stored));
-    } else {
-      setTorneos(torneosIniciales);
-      localStorage.setItem(STORAGE_KEY_TORNEOS, JSON.stringify(torneosIniciales));
-    }
-  };
-
-  // Cargar premios desde localStorage (cursos, diplomados, libros)
-  const cargarPremios = () => {
-    // Cargar cursos
-    const storedCursos = localStorage.getItem(STORAGE_KEY_CURSOS);
-    if (storedCursos) {
-      const cursosData = JSON.parse(storedCursos);
-      setCursos(cursosData);
-      console.log('Cursos cargados desde localStorage:', cursosData.length);
-    } else {
-      // Datos de ejemplo si no hay cursos
-      const cursosEjemplo = [
-        { id: 1, titulo: 'Derecho Civil', descripcion: 'Curso completo de Derecho Civil', duracion: '40 horas', precio: 1500, gratis: false, esPremioTorneo: true },
-        { id: 2, titulo: 'Derecho Penal', descripcion: 'Fundamentos del Derecho Penal', duracion: '35 horas', precio: 1200, gratis: false, esPremioTorneo: true }
-      ];
-      setCursos(cursosEjemplo);
-      console.log('Cursos de ejemplo cargados');
-    }
-
-    // Cargar diplomados
-    const storedDiplomados = localStorage.getItem(STORAGE_KEY_DIPLOMADOS);
-    if (storedDiplomados) {
-      const diplosData = JSON.parse(storedDiplomados);
-      setDiplomados(diplosData);
-      console.log('Diplomados cargados desde localStorage:', diplosData.length);
-    } else {
-      // Datos de ejemplo si no hay diplomados
-      const diplosEjemplo = [
-        { id: 1, titulo: 'Diplomado en Derecho Corporativo', descripcion: 'Especialización en derecho empresarial', duracion: '160 horas', precio: 5000, gratis: false, esPremioTorneo: true }
-      ];
-      setDiplomados(diplosEjemplo);
-      console.log('Diplomados de ejemplo cargados');
-    }
-
-    // Cargar libros
-    const storedLibros = localStorage.getItem(STORAGE_KEY_LIBROS);
-    if (storedLibros) {
-      const librosData = JSON.parse(storedLibros);
-      setLibros(librosData);
-      console.log('Libros cargados desde localStorage:', librosData.length);
-    } else {
-      // Datos de ejemplo si no hay libros
-      const librosEjemplo = [
-        { id: 1, titulo: 'Colección de Guías y Modelos', subtitulo: 'Tomos 1-8', precio: 8000, gratis: false, esPremioTorneo: true },
-        { id: 2, titulo: 'Guía de Arrendamiento', subtitulo: 'Tomo 2', precio: 350, gratis: false, esPremioTorneo: true }
-      ];
-      setLibros(librosEjemplo);
-      console.log('Libros de ejemplo cargados');
-    }
-  };
-
-  // Guardar torneos en localStorage
-  const guardarTorneosStorage = (nuevosTorneos) => {
-    localStorage.setItem(STORAGE_KEY_TORNEOS, JSON.stringify(nuevosTorneos));
-    setTorneos(nuevosTorneos);
-  };
 
   useEffect(() => {
     cargarTorneos();
     cargarPremios();
   }, []);
 
-  const subirImagen = async (file) => {
-    if (!file) return null;
+  const cargarTorneos = async () => {
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `torneo_${Date.now()}.${fileExt}`;
-      const storageRef = ref(storage, `torneos/${fileName}`);
+      const querySnapshot = await getDocs(collection(db, 'torneos'));
+      if (!querySnapshot.empty) {
+        const torneosData = [];
+        querySnapshot.forEach((doc) => {
+          torneosData.push({ id: doc.id, ...doc.data() });
+        });
+        setTorneos(torneosData);
+      } else {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) setTorneos(JSON.parse(stored));
+        else setTorneos(torneosIniciales);
+      }
+    } catch (error) {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) setTorneos(JSON.parse(stored));
+      else setTorneos(torneosIniciales);
+    }
+  };
+
+  const cargarPremios = async () => {
+    try {
+      const cursosSnap = await getDocs(collection(db, 'cursos'));
+      const cursosData = [];
+      cursosSnap.forEach((doc) => {
+        const data = doc.data();
+        cursosData.push({ id: doc.id, ...data, tipo: 'curso' });
+      });
+      setCursos(cursosData);
+    } catch (error) {
+      console.warn('No se pudieron cargar cursos:', error.message);
+      setCursos([]);
+    }
+
+    try {
+      const diplosSnap = await getDocs(collection(db, 'diplomados'));
+      const diplosData = [];
+      diplosSnap.forEach((doc) => {
+        const data = doc.data();
+        diplosData.push({ id: doc.id, ...data, tipo: 'diplomado' });
+      });
+      setDiplomados(diplosData);
+    } catch (error) {
+      console.warn('No se pudieron cargar diplomados:', error.message);
+      setDiplomados([]);
+    }
+
+    try {
+      const storedLibros = localStorage.getItem('lexmindi_libros');
+      if (storedLibros) {
+        const librosData = JSON.parse(storedLibros);
+        setLibros(librosData.map(l => ({ ...l, tipo: 'libro' })));
+      }
+    } catch (error) {
+      console.error('Error cargando libros:', error);
+      setLibros([]);
+    }
+  };
+
+  const subirImagen = async (file) => {
+    if (!file) return '';
+    
+    setSubiendoImagen(true);
+    try {
+      const nombreUnico = `torneos/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, nombreUnico);
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
       return url;
     } catch (error) {
-      console.error('Error subiendo imagen:', error);
+      console.error('Error al subir imagen:', error);
       alert('Error al subir la imagen');
-      return null;
+      return '';
+    } finally {
+      setSubiendoImagen(false);
     }
   };
 
-  const handleImageUpload = async (e) => {
+  const handleImagenChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     if (!file.type.startsWith('image/')) {
-      alert('❌ Solo se permiten imágenes');
+      alert('Solo se permiten imágenes');
       return;
     }
-    
-    if (file.size > 5 * 1024 * 1024) {
-      alert('❌ La imagen no debe superar 5MB');
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('La imagen no debe superar 2MB');
       return;
     }
-    
-    setGuardando(true);
+
     const url = await subirImagen(file);
     if (url) {
       setFormData({ ...formData, imagenPortada: url });
-      alert('✅ Imagen subida correctamente');
     }
-    setGuardando(false);
   };
 
-  const guardarTorneo = () => {
+  const guardarTorneo = async () => {
     if (!formData.titulo || !formData.fecha) {
       alert('Completa los campos obligatorios');
       return;
     }
 
-    // Obtener nombre del premio seleccionado
     let premioNombre = '';
     if (formData.premioTipo === 'curso' && formData.premioId) {
-      const curso = cursos.find(c => c.id === parseInt(formData.premioId));
+      const curso = cursos.find(c => c.id === formData.premioId);
       premioNombre = curso?.titulo || '';
     } else if (formData.premioTipo === 'diplomado' && formData.premioId) {
-      const diploma = diplomados.find(d => d.id === parseInt(formData.premioId));
+      const diploma = diplomados.find(d => d.id === formData.premioId);
       premioNombre = diploma?.titulo || '';
     } else if (formData.premioTipo === 'libro' && formData.premioId) {
-      const libro = libros.find(l => l.id === parseInt(formData.premioId));
+      const libro = libros.find(l => l.id === formData.premioId);
       premioNombre = libro?.titulo || '';
     }
 
-    let nuevosTorneos;
-    if (editandoTorneo) {
-      nuevosTorneos = torneos.map(t => 
-        t.id === editandoTorneo.id 
-          ? { 
-              ...t, 
-              ...formData, 
-              premioDinero: parseFloat(formData.premioDinero) || 0,
-              premioNombre,
-              actualizado: new Date().toISOString()
-            } 
-          : t
-      );
-    } else {
-      const nuevoId = Date.now();
-      nuevosTorneos = [...torneos, { 
-        id: nuevoId, 
-        ...formData, 
-        premioDinero: parseFloat(formData.premioDinero) || 0,
-        premioNombre,
-        participantes: 0,
-        creado: new Date().toISOString()
-      }];
+    const nuevoTorneo = {
+      titulo: formData.titulo,
+      descripcion: formData.descripcion,
+      fecha: formData.fecha,
+      imagenPortada: formData.imagenPortada || '',
+      premioDinero: parseFloat(formData.premioDinero) || 0,
+      premioTipo: formData.premioTipo,
+      premioId: formData.premioId || null,
+      premioNombre: premioNombre,
+      tipo: formData.tipo,
+      status: formData.status,
+      actualizado: new Date().toISOString()
+    };
+
+    if (!nuevoTorneo.imagenPortada && editandoTorneo?.imagenPortada) {
+      nuevoTorneo.imagenPortada = editandoTorneo.imagenPortada;
     }
 
-    guardarTorneosStorage(nuevosTorneos);
-    setShowForm(false);
-    setEditandoTorneo(null);
-    alert('✅ Torneo guardado correctamente');
+    try {
+      if (editandoTorneo) {
+        await updateDoc(doc(db, 'torneos', editandoTorneo.id), nuevoTorneo);
+        setTorneos(torneos.map(t => t.id === editandoTorneo.id ? { ...nuevoTorneo, id: t.id } : t));
+      } else {
+        const nuevoId = Date.now().toString();
+        await setDoc(doc(db, 'torneos', nuevoId), nuevoTorneo);
+        setTorneos([...torneos, { ...nuevoTorneo, id: nuevoId }]);
+      }
+      setShowForm(false);
+      setEditandoTorneo(null);
+      alert('✅ Torneo guardado correctamente');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('❌ Error al guardar');
+    }
   };
 
-  const eliminarTorneo = (id, e) => {
+  const eliminarTorneo = async (id, e) => {
     e.stopPropagation();
     if (!modoAdmin) return;
     if (window.confirm('¿Eliminar este torneo?')) {
-      const nuevosTorneos = torneos.filter(t => t.id !== id);
-      guardarTorneosStorage(nuevosTorneos);
+      try {
+        await deleteDoc(doc(db, 'torneos', id));
+        setTorneos(torneos.filter(t => t.id !== id));
+      } catch (error) {
+        setTorneos(torneos.filter(t => t.id !== id));
+      }
     }
   };
 
@@ -244,12 +243,17 @@ const ListaTorneos = ({ onSeleccionarTorneo, modoAdmin: modoAdminProp }) => {
       imagenPortada: torneo.imagenPortada || '',
       premioDinero: torneo.premioDinero?.toString() || '',
       premioTipo: torneo.premioTipo || 'dinero',
-      premioId: torneo.premioId?.toString() || '',
+      premioId: torneo.premioId || '',
       premioNombre: torneo.premioNombre || '',
       tipo: torneo.tipo || 'Individual',
       status: torneo.status || 'activo'
     });
     setShowForm(true);
+  };
+
+  const handleSeleccionarTorneo = (torneo) => {
+    localStorage.setItem('torneo_actual', JSON.stringify(torneo));
+    onSeleccionarTorneo(torneo);
   };
 
   const obtenerNombrePremio = (torneo) => {
@@ -290,7 +294,7 @@ const ListaTorneos = ({ onSeleccionarTorneo, modoAdmin: modoAdminProp }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 mb-8">
         {torneos.map(torneo => (
-          <div key={torneo.id} className="bg-white rounded-xl shadow-md border overflow-hidden hover:shadow-lg transition-shadow cursor-pointer" onClick={() => onSeleccionarTorneo(torneo)}>
+          <div key={torneo.id} className="bg-white rounded-xl shadow-md border overflow-hidden hover:shadow-lg transition-shadow cursor-pointer" onClick={() => handleSeleccionarTorneo(torneo)}>
             <div className="h-32 bg-gradient-to-br from-red-50 to-orange-100 relative overflow-hidden">
               {torneo.imagenPortada ? (
                 <img src={torneo.imagenPortada} alt={torneo.titulo} className="w-full h-full object-cover" />
@@ -326,7 +330,7 @@ const ListaTorneos = ({ onSeleccionarTorneo, modoAdmin: modoAdminProp }) => {
                 🏆 Premio: {obtenerNombrePremio(torneo)}
               </div>
               <button
-                onClick={() => onSeleccionarTorneo(torneo)}
+                onClick={(e) => { e.stopPropagation(); handleSeleccionarTorneo(torneo); }}
                 disabled={torneo.status !== 'activo'}
                 className={`mt-3 w-full py-2 rounded-lg text-sm font-semibold transition ${
                   torneo.status === 'activo' 
@@ -357,6 +361,47 @@ const ListaTorneos = ({ onSeleccionarTorneo, modoAdmin: modoAdminProp }) => {
                 <label className="block text-xs font-bold mb-1">Descripción</label>
                 <textarea rows="3" value={formData.descripcion} onChange={e => setFormData({...formData, descripcion: e.target.value})} className="w-full p-2 text-sm border rounded"></textarea>
               </div>
+              
+              {/* Campo de imagen de portada */}
+              <div>
+                <label className="block text-xs font-bold mb-1">📸 Imagen de portada</label>
+                <div className="flex items-center gap-3">
+                  <label className={`cursor-pointer bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center hover:bg-gray-50 transition flex-1 ${subiendoImagen ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleImagenChange} 
+                      className="hidden" 
+                      disabled={subiendoImagen}
+                    />
+                    <div className="flex flex-col items-center">
+                      <span className="material-symbols-outlined text-2xl text-gray-400">cloud_upload</span>
+                      <span className="text-xs text-gray-500">
+                        {subiendoImagen ? 'Subiendo...' : 'Subir imagen'}
+                      </span>
+                    </div>
+                  </label>
+                  
+                  {formData.imagenPortada && (
+                    <div className="relative w-16 h-16 rounded-lg overflow-hidden border">
+                      <img 
+                        src={formData.imagenPortada} 
+                        alt="Vista previa" 
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, imagenPortada: '' })}
+                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Formatos: JPG, PNG, GIF. Máx. 2MB</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold mb-1">Fecha *</label>
@@ -371,40 +416,6 @@ const ListaTorneos = ({ onSeleccionarTorneo, modoAdmin: modoAdminProp }) => {
                 </div>
               </div>
               
-              {/* Imagen de portada */}
-              <div>
-                <label className="block text-xs font-bold mb-1">Imagen de portada</label>
-                <div className="flex gap-2 flex-wrap">
-                  <input 
-                    type="url" 
-                    placeholder="https://... o sube una imagen" 
-                    value={formData.imagenPortada} 
-                    onChange={e => setFormData({...formData, imagenPortada: e.target.value})} 
-                    className="flex-1 p-2 text-sm border rounded" 
-                  />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    id="imagenUpload"
-                    disabled={guardando}
-                  />
-                  <label 
-                    htmlFor="imagenUpload" 
-                    className="cursor-pointer bg-gray-100 text-center py-2 px-4 rounded-lg border hover:bg-gray-200 transition text-sm"
-                  >
-                    {guardando ? '⏳ Subiendo...' : '📁 Subir imagen'}
-                  </label>
-                </div>
-                {formData.imagenPortada && (
-                  <div className="mt-2">
-                    <img src={formData.imagenPortada} alt="Preview" className="h-16 w-24 object-cover rounded border" />
-                  </div>
-                )}
-              </div>
-              
-              {/* Selección de premio */}
               <div className="border-t pt-3 mt-2">
                 <label className="block text-xs font-bold mb-2">🏆 Tipo de premio</label>
                 <div className="grid grid-cols-4 gap-2 mb-3">
@@ -441,7 +452,7 @@ const ListaTorneos = ({ onSeleccionarTorneo, modoAdmin: modoAdminProp }) => {
                 {formData.premioTipo === 'dinero' && (
                   <div>
                     <label className="block text-xs font-bold mb-1">Monto del premio (MXN)</label>
-                    <input type="number" step="0.01" value={formData.premioDinero} onChange={e => setFormData({...formData, premioDinero: e.target.value})} className="w-full p-2 text-sm border rounded" placeholder="0.00" />
+                    <input type="number" step="0.01" value={formData.premioDinero} onChange={e => setFormData({...formData, premioDinero: e.target.value})} className="w-full p-2 text-sm border rounded" />
                   </div>
                 )}
 
@@ -456,6 +467,7 @@ const ListaTorneos = ({ onSeleccionarTorneo, modoAdmin: modoAdminProp }) => {
                         </option>
                       ))}
                     </select>
+                    {cursos.length === 0 && <p className="text-xs text-amber-600 mt-1">No hay cursos disponibles</p>}
                   </div>
                 )}
 
@@ -470,6 +482,7 @@ const ListaTorneos = ({ onSeleccionarTorneo, modoAdmin: modoAdminProp }) => {
                         </option>
                       ))}
                     </select>
+                    {diplomados.length === 0 && <p className="text-xs text-amber-600 mt-1">No hay diplomados disponibles</p>}
                   </div>
                 )}
 
@@ -484,6 +497,7 @@ const ListaTorneos = ({ onSeleccionarTorneo, modoAdmin: modoAdminProp }) => {
                         </option>
                       ))}
                     </select>
+                    {libros.length === 0 && <p className="text-xs text-amber-600 mt-1">No hay libros disponibles</p>}
                   </div>
                 )}
               </div>

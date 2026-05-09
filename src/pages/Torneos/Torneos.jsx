@@ -27,8 +27,10 @@ const Torneos = () => {
     setVista('registro');
   };
 
+  // ✅ REGISTRAR PARTICIPANTE CON AVATAR
   const registrarParticipante = (datos) => {
     if (!user) return;
+    
     const nuevoParticipante = {
       id: `torneo_${torneoActual.id}_${user.uid}`,
       torneoId: torneoActual.id,
@@ -36,6 +38,7 @@ const Torneos = () => {
       nombre: datos.nombre,
       telefono: datos.telefono,
       email: datos.email || user.email,
+      avatar: datos.avatar || null,  // ✅ Guardar avatar
       pagado: false,
       fase: 'registrado'
     };
@@ -65,10 +68,8 @@ const Torneos = () => {
     setVista('eliminatorias');
   };
 
-  // ✅ FUNCIÓN CORREGIDA - Recibe esCampeon
   const handleDueloFinalizado = (puntos, gano, puntosRival, nombreRival, campeon = false, premio = 0) => {
     if (campeon) {
-      // Guardar datos del campeón en localStorage
       const campeonData = {
         torneo: torneoActual,
         participante: participante,
@@ -87,14 +88,12 @@ const Torneos = () => {
     setMostrarResultado(true);
   };
 
-  // Función para reiniciar después de ver resultado
   const handleContinuar = () => {
     setMostrarResultado(false);
     setResultadoDuelo(null);
     setEsCampeon(false);
     setPremioGanado(0);
     
-    // Si era campeón, redirigir a reclamar premio
     if (esCampeon) {
       window.location.href = '/reclamar-premio';
     }
@@ -124,9 +123,7 @@ const Torneos = () => {
       <BuscadorRival
         torneo={torneoActual}
         fase={vista}
-        onBuscarRival={() => {
-          setMostrarBuscador(false);
-        }}
+        onBuscarRival={() => setMostrarBuscador(false)}
         onVolver={() => {
           setMostrarBuscador(false);
           setVista('lista');

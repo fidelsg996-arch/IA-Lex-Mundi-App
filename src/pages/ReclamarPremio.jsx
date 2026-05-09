@@ -1,131 +1,128 @@
-import React, { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const ReclamarPremio = () => {
   const { user } = useAuth();
-  const [codigo, setCodigo] = useState('');
+  const [campeonData, setCampeonData] = useState(null);
+  const [codigoIngresado, setCodigoIngresado] = useState('');
   const [mensaje, setMensaje] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [premioInfo, setPremioInfo] = useState(null);
-  const [yaReclamado, setYaReclamado] = useState(false);
+  const [reclamado, setReclamado] = useState(false);
 
   useEffect(() => {
-    const cargarInfo = async () => {
-      const torneoSnap = await getDoc(doc(db, "torneos", "torneo_agrario"));
-      if (torneoSnap.exists()) {
-        setPremioInfo(torneoSnap.data().premio);
-      }
-      
-      if (user) {
-        const reclamacionSnap = await getDoc(doc(db, "premios_reclamados", `${user.uid}_torneo_agrario`));
-        if (reclamacionSnap.exists()) {
-          setYaReclamado(true);
-          setMensaje("✅ Ya has reclamado tu premio. Revisa tu correo.");
-        }
-      }
-    };
-    cargarInfo();
-  }, [user]);
+    const stored = localStorage.getItem('campeon_actual');
+    if (stored) {
+      setCampeonData(JSON.parse(stored));
+    }
+  }, []);
 
-  const reclamarPremio = async () => {
-    if (!user) {
-      setMensaje("❌ Debes iniciar sesión para reclamar el premio");
+  const handleReclamar = () => {
+    if (!campeonData) {
+      setMensaje('❌ No hay información de campeón');
       return;
     }
-    
-    if (yaReclamado) {
-      setMensaje("❌ Ya has reclamado tu premio anteriormente");
+
+    // ✅ Verificar código automáticamente (sin admin)
+    if (codigoIngresado !== campeonData.codigo) {
+      setMensaje('❌ Código incorrecto');
       return;
     }
+
+    setMensaje('✅ ¡Premio reclamado con éxito! El libro será enviado a tu correo.');
+    setReclamado(true);
     
-    if (codigo !== "AGRARIA2026") {
-      setMensaje("❌ Código incorrecto. El código es: AGRARIA2026");
-      return;
-    }
+    // Marcar como reclamado para que no se pueda reclamar otra vez
+    localStorage.setItem('premio_reclamado', 'true');
     
-    setLoading(true);
-    
-    try {
-      const participanteRef = doc(db, "participantes_torneo", `torneo_agrario_${user.uid}`);
-      const participanteSnap = await getDoc(participanteRef);
-      const esCampeon = participanteSnap.exists() && participanteSnap.data().esCampeon === true;
-      
-      if (!esCampeon) {
-        setMensaje("❌ Solo el campeón del torneo puede reclamar este premio");
-        setLoading(false);
-        return;
-      }
-      
-      await setDoc(doc(db, "premios_reclamados", `${user.uid}_torneo_agrario`), {
-        usuarioId: user.uid,
-        usuarioEmail: user.email,
-        usuarioNombre: participanteSnap.data()?.usuarioNombre || user.displayName,
-        premio: premioInfo?.nombre || "Guía y Modelos en Materia Agraria",
-        codigoUsado: codigo,
-        fechaReclamacion: new Date().toISOString(),
-        estado: "entregado"
-      });
-      
-      setMensaje("✅ ¡Felicidades! Has reclamado tu libro. Revisa tu correo para los detalles de entrega.");
-      setYaReclamado(true);
-      
-    } catch (error) {
-      console.error("Error:", error);
-      setMensaje("❌ Error al reclamar el premio. Contacta al administrador.");
-    } finally {
-      setLoading(false);
-    }
+    setTimeout(() => {
+      window.location.href = '/panel-principal';
+    }, 3000);
   };
 
-  return (
-    <div className="max-w-md mx-auto p-6 mt-10">
-      <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-        <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white text-center">
-          <h1 className="text-2xl font-bold">🏆 Reclamar Premio 🏆</h1>
-          <p className="opacity-90 mt-1">Ingresa tu código de campeón</p>
+  if (!campeonData) {
+    return (
+      <div className="max-w-md mx-auto p-4 text-center">
+        <div className="bg-white rounded-2xl shadow-xl p-6">
+          <div className="text-6xl mb-4">🏆</div>
+          <h2 className="text-xl font-bold mb-2">No hay premio pendiente</h2>
+          <p className="text-gray-600">Participa en torneos para ganar premios.</p>
+          <a href="/torneos" className="inline-block mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg">
+            Ver torneos
+          </a>
         </div>
-        
+      </div>
+    );
+  }
+
+  const premio = campeonData.premio || 'Guía completa de Derecho Agrario';
+  const tituloTorneo = campeonData.torneo?.titulo || 'Torneo';
+  const codigoGenerado = campeonData.codigo || '';
+
+  return (
+    <div className="max-w-md mx-auto p-4">
+      <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-gradient-to-r from-amber-600 to-yellow-600 p-6 text-white text-center">
+          <div className="text-5xl mb-2">🏆</div>
+          <h1 className="text-2xl font-bold">¡FELICIDADES CAMPEÓN!</h1>
+          <p className="text-amber-100">Has ganado el torneo</p>
+        </div>
+
         <div className="p-6">
-          {premioInfo && (
-            <div className="bg-amber-50 rounded-xl p-4 mb-6 text-center">
-              <p className="text-sm text-gray-600">Premio del Torneo Agrario</p>
-              <p className="font-bold text-lg text-amber-700">{premioInfo.nombre}</p>
-              <p className="text-xs text-gray-500 mt-1">{premioInfo.descripcion}</p>
+          <div className="text-center mb-6">
+            <h2 className="text-xl font-bold text-gray-800">{tituloTorneo}</h2>
+            <div className="bg-green-50 rounded-xl p-4 mt-4">
+              <p className="text-sm text-gray-500">🏆 Premio</p>
+              <p className="font-bold text-green-700">{typeof premio === 'number' ? `$${premio.toLocaleString()} MXN` : premio}</p>
             </div>
-          )}
-          
-          <div className="mb-4">
-            <label className="block text-sm font-bold mb-2">Código de campeón</label>
-            <input
-              type="text"
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-              placeholder="Ingresa tu código"
-              className="w-full p-3 border rounded-lg text-center text-xl font-mono"
-              disabled={loading || yaReclamado}
-            />
-            <p className="text-xs text-gray-400 mt-1">El código es: AGRARIA2026</p>
           </div>
-          
-          {mensaje && (
-            <div className={`p-3 rounded-lg mb-4 text-center ${mensaje.includes("✅") ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-              {mensaje}
+
+          {!reclamado ? (
+            <>
+              <div className="bg-amber-50 rounded-xl p-4 mb-6">
+                <p className="text-sm font-semibold text-amber-800 mb-2">🎫 Tu código de campeón</p>
+                <div className="bg-white rounded-lg p-3 text-center border border-amber-200">
+                  <p className="text-xs text-gray-500">Código único generado al ganar:</p>
+                  <p className="font-mono text-lg font-bold text-amber-600">{codigoGenerado}</p>
+                </div>
+                <p className="text-xs text-amber-700 mt-2">
+                  ⚠️ Guarda este código. Lo necesitarás para reclamar tu premio.
+                </p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-bold mb-2">Confirma tu código</label>
+                <input
+                  type="text"
+                  placeholder="Ingresa tu código de campeón"
+                  value={codigoIngresado}
+                  onChange={(e) => setCodigoIngresado(e.target.value.toUpperCase())}
+                  className="w-full p-3 border rounded-lg"
+                />
+              </div>
+
+              {mensaje && (
+                <div className={`p-3 rounded-lg mb-4 text-sm ${mensaje.includes('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  {mensaje}
+                </div>
+              )}
+
+              <button
+                onClick={handleReclamar}
+                disabled={!codigoIngresado}
+                className="w-full bg-amber-600 text-white py-3 rounded-lg font-bold hover:bg-amber-700 disabled:opacity-50"
+              >
+                🎁 Reclamar Premio
+              </button>
+            </>
+          ) : (
+            <div className="text-center">
+              <div className="text-5xl mb-4">🎉</div>
+              <p className="text-green-600 font-bold mb-4">¡Premio reclamado con éxito!</p>
+              <p className="text-gray-600">El premio será enviado a tu correo registrado.</p>
+              <a href="/panel-principal" className="inline-block mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg">
+                Ir al inicio
+              </a>
             </div>
           )}
-          
-          <button
-            onClick={reclamarPremio}
-            disabled={loading || yaReclamado}
-            className="w-full bg-amber-500 text-white py-3 rounded-lg font-bold hover:bg-amber-600 transition disabled:opacity-50"
-          >
-            {loading ? 'Procesando...' : yaReclamado ? '✅ Premio reclamado' : '🎁 Reclamar Premio'}
-          </button>
-          
-          <p className="text-xs text-gray-400 text-center mt-4">
-            El libro será enviado a tu correo electrónico registrado
-          </p>
         </div>
       </div>
     </div>
