@@ -36,6 +36,7 @@ import MiSuscripcion from './pages/MiSuscripcion';
 import MiBilletera from './pages/MiBilletera';
 import AdminPanel from './pages/AdminPanel';
 import AdminFirmas from './components/AdminFirmas';
+import PreguntasAdmin from './pages/Admin/PreguntasAdmin';  // ✅ NUEVA IMPORTACIÓN
 
 function App() {
   return (
@@ -61,7 +62,6 @@ function App() {
                 <Route path="/quiz-legal" element={<QuizLegal />} />
                 <Route path="/libros" element={<Libros />} />
                 
-                {/* ✅ RUTAS DE CURSOS CORREGIDAS */}
                 <Route path="/cursos" element={<Cursos />} />
                 <Route path="/cursos/nuevo" element={<CursoDetalle />} />
                 <Route path="/cursos/:id" element={<CursoDetalle />} />
@@ -84,6 +84,7 @@ function App() {
               </Route>
 
               <Route path="/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
+              <Route path="/admin/preguntas" element={<ProtectedRoute><PreguntasAdmin /></ProtectedRoute>} />  {/* ✅ NUEVA RUTA */}
               <Route path="/admin/firmas-secreto-2024" element={<AdminFirmas />} />
             </Routes>
           </BilleteraProvider>

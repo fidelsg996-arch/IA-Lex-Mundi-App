@@ -13,7 +13,7 @@ const Clasificacion = ({ torneo, participante, onAvanzarGrupos, onVolver, setPar
 
   const METAS_COMPETENCIAS = 3;
   const PUNTOS_POR_COMPETENCIA = 10;
-  const PUNTOS_MAXIMOS = METAS_COMPETENCIas * PUNTOS_POR_COMPETENCIA;
+  const PUNTOS_MAXIMOS = METAS_COMPETENCIAS * PUNTOS_POR_COMPETENCIA;
   const PUNTOS_MIN_CLASIFICACION = 15;
 
   // Cargar progreso guardado
@@ -127,7 +127,6 @@ const Clasificacion = ({ torneo, participante, onAvanzarGrupos, onVolver, setPar
         {/* Header */}
         <div className="bg-gradient-to-r from-red-700 to-red-600 p-6 text-white text-center">
           <h2 className="text-3xl font-black">{torneo.titulo}</h2>
-          {/* ✅ CORREGIDO: "Fase de Clasificación" */}
           <p className="text-xl">🏆 Fase de Clasificación</p>
           <div className="mt-4 bg-white/20 rounded-full px-6 py-2 inline-block">
             <span className="text-4xl font-black">{puntajeTotal}</span>

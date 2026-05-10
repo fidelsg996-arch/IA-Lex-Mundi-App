@@ -1,6 +1,6 @@
 // src/pages/AdminPanel.js
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';  // ✅ Agrega Link aquí
 import { useTools } from '../context/ToolsContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -11,7 +11,7 @@ const AdminPanel = () => {
   const [users, setUsers] = useState([]);
   const [message, setMessage] = useState('');
 
-  const esAdmin = isAdmin();  // ✅ Usa la función del contexto
+  const esAdmin = isAdmin();
 
   const handleLogout = () => {
     logout();
@@ -76,6 +76,25 @@ const AdminPanel = () => {
       </div>
       {message && <div className="mb-4 p-2 bg-blue-100 text-blue-700 rounded">{message}</div>}
       
+      {/* ✅ NUEVA SECCIÓN: Accesos rápidos */}
+      <div className="mb-10">
+        <h2 className="text-xl font-bold text-gray-800 mb-4">⚙️ Accesos Rápidos</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Link 
+            to="/admin/preguntas"
+            className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-5 rounded-xl shadow-md hover:shadow-lg transition-all hover:scale-105"
+          >
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-3xl">quiz</span>
+              <div>
+                <h3 className="font-bold text-lg">Banco de Preguntas</h3>
+                <p className="text-blue-100 text-sm">Gestionar preguntas del CNPCyF</p>
+              </div>
+            </div>
+          </Link>
+        </div>
+      </div>
+
       <div className="mb-10">
         <h2 className="text-xl font-bold text-gray-800 mb-4">Gestión de Herramientas</h2>
         <p className="text-gray-600 mb-4">Habilita o deshabilita herramientas visibles en el menú lateral.</p>

@@ -7,7 +7,7 @@ import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
 const Cursos = () => {
   const navigate = useNavigate();
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const modoAdmin = isAdmin();
   const [cursos, setCursos] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -108,13 +108,26 @@ const Cursos = () => {
               </div>
               <p className="text-gray-600 text-xs mt-1 line-clamp-2">{curso.descripcion}</p>
               <div className="flex justify-between items-center text-xs text-gray-500 border-t pt-2 mt-2">
-                <span>⏱️ {curso.duracion}</span>
-                <span>📚 {curso.modulo?.length || 0} módulos</span>
+                <span>⏱️ {curso.duracion || 'N/E'}</span>
+                {/* ✅ LÍNEA CORREGIDA - AHORA USA 'modulos' (plural) */}
+                <span>📚 {curso.modulos?.length || curso.modulo?.length || 0} módulos</span>
               </div>
             </div>
           </div>
         ))}
       </div>
+
+      {cursos.length === 0 && (
+        <div className="text-center py-20 bg-white rounded-xl">
+          <span className="material-symbols-outlined text-6xl text-gray-300">school</span>
+          <p className="text-gray-500 mt-2">No hay cursos disponibles</p>
+          {modoAdmin && (
+            <button onClick={nuevoCurso} className="mt-4 bg-blue-500 text-white px-4 py-2 rounded-lg">
+              Crear primer curso
+            </button>
+          )}
+        </div>
+      )}
 
       {modoAdmin && (
         <div className="fixed bottom-4 right-4 z-50 bg-amber-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
