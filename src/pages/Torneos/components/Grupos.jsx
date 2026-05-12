@@ -22,6 +22,7 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
   ];
 
   const generarAvatarUrl = (nombre, color = '3B82F6') => {
+    if (!nombre) return `https://ui-avatars.com/api/?name=US&background=${color}&color=fff&rounded=true&size=128`;
     const iniciales = nombre.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(iniciales)}&background=${color}&color=fff&rounded=true&size=128`;
   };
@@ -38,7 +39,6 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
       
       if (!grupoActual) return;
       
-      // Cargar duelos desde Firestore
       const duelosRef = collection(db, 'duelos_grupos');
       const duelosQ = query(duelosRef, where('usuarioId', '==', user?.uid), where('torneoId', '==', torneoId));
       const duelosSnap = await getDocs(duelosQ);
@@ -49,11 +49,6 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
       });
       
       if (duelosData.length === 0) {
-        // Crear duelos si no existen
-        const participantesRef = collection(db, 'participantes_grupos');
-        const q = query(participantesRef, where('torneoId', '==', torneoId), where('grupo', '==', grupoActual), where('esUsuario', '==', true));
-        const participantesSnap = await getDocs(q);
-        
         const rivales = NOMBRES_RIVALES.slice(0, TOTAL_DUELOS);
         const nuevosDuelos = [];
         
@@ -109,7 +104,6 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
         fecha: new Date().toISOString()
       });
       
-      // Actualizar estado local
       const nuevosDuelos = duelos.map(d => 
         d.rivalNombre === nombreRival
           ? { ...d, completado: true, ganado: gano, puntosUsuario, puntosRival }
@@ -130,14 +124,25 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
   };
 
   const iniciarDuelo = (duelo) => {
-    if (duelo.completado) {
+    if (!duelo) {
+      console.error('Duelo no válido');
       return;
     }
     
-    // Verificar si es el siguiente duelo
+    if (duelo.completado) {
+      alert('⚠️ Este duelo ya fue completado');
+      return;
+    }
+    
+    // ✅ CORREGIDO: Verificar si es el siguiente duelo sin usar indexOf problemático
     const siguienteIndex = duelos.findIndex(d => !d.completado);
-    if (duelos.indexOf(duelo) !== siguienteIndex) {
-      alert(`⚠️ Primero debes completar el duelo contra ${duelos[siguienteIndex]?.rivalNombre}`);
+    const dueloIndex = duelos.findIndex(d => d.id === duelo.id);
+    
+    if (dueloIndex !== siguienteIndex) {
+      const siguienteDuelo = duelos[siguienteIndex];
+      if (siguienteDuelo) {
+        alert(`⚠️ Primero debes completar el duelo contra ${siguienteDuelo.rivalNombre}`);
+      }
       return;
     }
     
@@ -149,9 +154,6 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
   const finalizarDuelo = (puntosUsuario, gano, puntosRival, nombreRival) => {
     setMostrarDuelo(false);
     
-    // ✅ GANÓ o PERDIÓ el duelo, pero NO es eliminado del torneo
-    // Solo registramos el resultado y pasamos al siguiente duelo
-    
     if (!gano) {
       alert(`💀 Perdiste el duelo contra ${nombreRival}. Pasarás al siguiente duelo.`);
     } else {
@@ -162,7 +164,6 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
   };
 
   const completarFaseGrupos = async () => {
-    // Verificar si tiene al menos 2 victorias para avanzar
     if (victorias >= 2) {
       alert(`✅ ¡Felicidades! Clasificaste a Eliminatorias con ${victorias} victorias y ${puntajeTotal} puntos`);
       
@@ -187,42 +188,46 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
   const inicializarGrupo = async () => {
     setCargando(true);
     
-    let grupoActual = participante?.grupo;
-    
-    if (!grupoActual) {
-      grupoActual = asignarGrupoAleatorio();
+    try {
+      let grupoActual = participante?.grupo;
       
-      const participanteRef = doc(db, 'participantes_torneo', user?.uid);
-      await setDoc(participanteRef, {
-        ...participante,
-        grupo: grupoActual,
-        fase: 'grupos',
-        puntajeTotal: 0,
-        victorias: 0,
-        partidosJugados: 0
-      }, { merge: true });
-      
-      if (setParticipante) {
-        setParticipante({ ...participante, grupo: grupoActual });
+      if (!grupoActual) {
+        grupoActual = asignarGrupoAleatorio();
+        
+        const participanteRef = doc(db, 'participantes_torneo', user?.uid);
+        await setDoc(participanteRef, {
+          ...participante,
+          grupo: grupoActual,
+          fase: 'grupos',
+          puntajeTotal: 0,
+          victorias: 0,
+          partidosJugados: 0
+        }, { merge: true });
+        
+        if (setParticipante) {
+          setParticipante({ ...participante, grupo: grupoActual });
+        }
+        
+        const grupoRef = doc(db, 'participantes_grupos', user?.uid);
+        await setDoc(grupoRef, {
+          id: user?.uid,
+          nombre: participante?.nombre || user?.displayName,
+          avatar: participante?.avatar || generarAvatarUrl(participante?.nombre || user?.displayName),
+          torneoId: torneo?.id,
+          grupo: grupoActual,
+          esUsuario: true,
+          puntajeTotal: 0,
+          victorias: 0,
+          partidosJugados: 0
+        }, { merge: true });
       }
       
-      // Registrar en participantes_grupos
-      const grupoRef = doc(db, 'participantes_grupos', user?.uid);
-      await setDoc(grupoRef, {
-        id: user?.uid,
-        nombre: participante?.nombre || user?.displayName,
-        avatar: participante?.avatar || generarAvatarUrl(participante?.nombre || user?.displayName),
-        torneoId: torneo?.id,
-        grupo: grupoActual,
-        esUsuario: true,
-        puntajeTotal: 0,
-        victorias: 0,
-        partidosJugados: 0
-      }, { merge: true });
+      await cargarDuelos();
+    } catch (error) {
+      console.error('Error inicializando grupo:', error);
+    } finally {
+      setCargando(false);
     }
-    
-    await cargarDuelos();
-    setCargando(false);
   };
 
   useEffect(() => {
@@ -298,12 +303,12 @@ const Grupos = ({ torneo, participante, onAvanzarEliminatorias, onVolver, setPar
               const completado = duelo.completado;
               
               return (
-                <div key={idx} className={`border rounded-xl p-4 ${
+                <div key={duelo.id || idx} className={`border rounded-xl p-4 ${
                   completado ? 'bg-gray-100' : esSiguiente ? 'bg-white shadow-lg border-indigo-300' : 'bg-gray-50 opacity-60'
                 }`}>
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-12 h-12 rounded-full bg-gray-300 overflow-hidden">
-                      <img src={duelo.rivalAvatar} alt={duelo.rivalNombre} className="w-full h-full object-cover" />
+                      <img src={duelo.rivalAvatar || generarAvatarUrl(duelo.rivalNombre, '6B7280')} alt={duelo.rivalNombre} className="w-full h-full object-cover" />
                     </div>
                     <div>
                       <p className="font-bold text-gray-800">{duelo.rivalNombre}</p>

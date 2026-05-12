@@ -1,3 +1,4 @@
+// src/App.js
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToolsProvider } from './context/ToolsContext';
@@ -36,7 +37,7 @@ import MiSuscripcion from './pages/MiSuscripcion';
 import MiBilletera from './pages/MiBilletera';
 import AdminPanel from './pages/AdminPanel';
 import AdminFirmas from './components/AdminFirmas';
-import PreguntasAdmin from './pages/Admin/PreguntasAdmin';  // ✅ NUEVA IMPORTACIÓN
+import PreguntasAdmin from './pages/Admin/PreguntasAdmin';
 
 function App() {
   return (
@@ -45,10 +46,12 @@ function App() {
         <ToolsProvider>
           <BilleteraProvider>
             <Routes>
+              {/* Rutas públicas */}
               <Route path="/" element={<LandingPage />} />
               <Route path="/acceso" element={<Login />} />
               <Route path="/registrarse" element={<Registrarse />} />
               
+              {/* Rutas protegidas con Layout */}
               <Route element={<Layout />}>
                 <Route path="/panel-principal" element={<PanelPrincipal />} />
                 <Route path="/expedientes" element={<Expedientes />} />
@@ -62,11 +65,13 @@ function App() {
                 <Route path="/quiz-legal" element={<QuizLegal />} />
                 <Route path="/libros" element={<Libros />} />
                 
+                {/* Rutas de Cursos */}
                 <Route path="/cursos" element={<Cursos />} />
                 <Route path="/cursos/nuevo" element={<CursoDetalle />} />
-                <Route path="/cursos/:id" element={<CursoDetalle />} />
                 <Route path="/cursos/:id/editar" element={<CursoDetalle />} />
+                <Route path="/cursos/:id" element={<CursoDetalle />} />
                 
+                {/* Otras rutas */}
                 <Route path="/diplomados" element={<Diplomados />} />
                 <Route path="/torneos" element={<Torneos />} />
                 <Route path="/reclamar-premio" element={<ReclamarPremio />} />
@@ -83,8 +88,9 @@ function App() {
                 <Route path="/contacto" element={<Contacto />} />
               </Route>
 
+              {/* Rutas de administrador */}
               <Route path="/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
-              <Route path="/admin/preguntas" element={<ProtectedRoute><PreguntasAdmin /></ProtectedRoute>} />  {/* ✅ NUEVA RUTA */}
+              <Route path="/admin/preguntas" element={<ProtectedRoute><PreguntasAdmin /></ProtectedRoute>} />
               <Route path="/admin/firmas-secreto-2024" element={<AdminFirmas />} />
             </Routes>
           </BilleteraProvider>
