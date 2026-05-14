@@ -1,6 +1,12 @@
 // src/pages/Expedientes.jsx
 import { useState, useEffect } from 'react';
-import { usePersistencia } from '../hooks/usePersistencia';
+import { useAuth } from '../context/AuthContext';
+import { 
+  obtenerExpedientes, 
+  crearExpediente, 
+  actualizarExpediente, 
+  eliminarExpedienteFirestore 
+} from '../services/expedienteService';
 
 // --- Configuración de IndexedDB (para PDFs grandes) ---
 const DB_NAME = 'LexMindiDB';
@@ -66,9 +72,9 @@ const eliminarDocumentoDeDB = async (docId) => {
 
 // --- Componente principal ---
 const Expedientes = () => {
-  // Usar persistencia para los expedientes (metadatos)
-  const { datos: expedientes, guardarDatos, cargando } = usePersistencia('expedientes', []);
+  const { user } = useAuth();
   const [expedientesLocal, setExpedientesLocal] = useState([]);
+  const [cargando, setCargando] = useState(true);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [formData, setFormData] = useState({
@@ -88,42 +94,30 @@ const Expedientes = () => {
   });
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
+  const [sincronizando, setSincronizando] = useState(false);
 
-  // Sincronizar con Firestore cuando cambian los datos
-  useEffect(() => {
-    if (expedientes && expedientes.length > 0) {
+  // Cargar expedientes desde Firestore
+  const cargarExpedientes = async () => {
+    if (!user?.uid) return;
+    
+    setCargando(true);
+    try {
+      const expedientes = await obtenerExpedientes(user.uid);
       setExpedientesLocal(expedientes);
-    } else if (!cargando && (!expedientes || expedientes.length === 0)) {
-      // Datos de ejemplo si no hay nada
-      const ejemplos = [
-        {
-          id: 1, numero: '2025-001', estadoProcesal: 'Activo', parteActora: 'María González',
-          parteDemandada: 'Empresa XYZ', asunto: 'Despido improcedente', cuantia: '150,000',
-          fecha: '2025-01-15', jurisdiccion: 'México', juzgado: 'Juzgado Primero de lo Laboral',
-          secretaria: 'Secretaría A', actuaria: 'Lic. Ana Torres', mesa: 'Mesa 3', notas: 'Demanda presentada',
-          documentos: []
-        },
-        {
-          id: 2, numero: '2025-002', estadoProcesal: 'En trámite', parteActora: 'Juan Pérez',
-          parteDemandada: 'Constructora ABC', asunto: 'Reclamación de cantidad', cuantia: '300,000',
-          fecha: '2025-02-10', jurisdiccion: 'México', juzgado: 'Juzgado Civil',
-          secretaria: 'Secretaría B', actuaria: 'Lic. Carlos Ruiz', mesa: 'Mesa 1', notas: 'Esperando contestación',
-          documentos: []
-        },
-        {
-          id: 3, numero: '2024-089', estadoProcesal: 'Cerrado', parteActora: 'Ana López',
-          parteDemandada: 'Carlos López', asunto: 'Divorcio contencioso', cuantia: 'N/A',
-          fecha: '2024-11-20', jurisdiccion: 'México', juzgado: 'Juzgado Familiar',
-          secretaria: 'Secretaría C', actuaria: 'Lic. Diana Flores', mesa: 'Mesa 2', notas: 'Sentencia favorable',
-          documentos: []
-        }
-      ];
-      setExpedientesLocal(ejemplos);
-      guardarDatos(ejemplos);
+    } catch (error) {
+      console.error('Error cargando expedientes:', error);
+    } finally {
+      setCargando(false);
     }
-  }, [expedientes, cargando]);
+  };
 
-  const generarId = () => Date.now();
+  useEffect(() => {
+    if (user?.uid) {
+      cargarExpedientes();
+    }
+  }, [user]);
+
+  const generarId = () => Date.now().toString();
 
   const abrirModalNuevo = () => {
     setEditandoId(null);
@@ -154,31 +148,72 @@ const Expedientes = () => {
       return;
     }
     
-    let nuevosExpedientes;
-    if (editandoId) {
-      nuevosExpedientes = expedientesLocal.map(exp =>
-        exp.id === editandoId ? { ...formData, id: editandoId, documentos: exp.documentos || [] } : exp
-      );
-    } else {
-      nuevosExpedientes = [...expedientesLocal, { ...formData, id: generarId(), documentos: [] }];
-    }
+    setSincronizando(true);
     
-    setExpedientesLocal(nuevosExpedientes);
-    await guardarDatos(nuevosExpedientes);
-    setModalAbierto(false);
+    try {
+      const expedienteData = {
+        usuarioId: user.uid,
+        numero: formData.numero,
+        estadoProcesal: formData.estadoProcesal,
+        parteActora: formData.parteActora,
+        parteDemandada: formData.parteDemandada,
+        asunto: formData.asunto,
+        cuantia: formData.cuantia,
+        fecha: formData.fecha,
+        jurisdiccion: formData.jurisdiccion,
+        juzgado: formData.juzgado,
+        secretaria: formData.secretaria,
+        actuaria: formData.actuaria,
+        mesa: formData.mesa,
+        notas: formData.notas,
+        documentos: editandoId ? expedientesLocal.find(e => e.id === editandoId)?.documentos || [] : []
+      };
+
+      let expedienteGuardado;
+      
+      if (editandoId) {
+        await actualizarExpediente(editandoId, expedienteData);
+        expedienteGuardado = { id: editandoId, ...expedienteData };
+      } else {
+        expedienteGuardado = await crearExpediente(expedienteData);
+      }
+      
+      // Actualizar lista local
+      if (editandoId) {
+        setExpedientesLocal(expedientesLocal.map(exp => 
+          exp.id === editandoId ? expedienteGuardado : exp
+        ));
+      } else {
+        setExpedientesLocal([expedienteGuardado, ...expedientesLocal]);
+      }
+      
+      setModalAbierto(false);
+    } catch (error) {
+      console.error('Error guardando expediente:', error);
+      alert('Error al guardar el expediente');
+    } finally {
+      setSincronizando(false);
+    }
   };
 
   const eliminarExpediente = async (id) => {
     if (window.confirm('¿Eliminar este expediente y todos sus documentos?')) {
-      const expediente = expedientesLocal.find(exp => exp.id === id);
-      if (expediente && expediente.documentos) {
-        for (const doc of expediente.documentos) {
-          await eliminarDocumentoDeDB(doc.id);
+      setSincronizando(true);
+      try {
+        const expediente = expedientesLocal.find(exp => exp.id === id);
+        if (expediente && expediente.documentos) {
+          for (const doc of expediente.documentos) {
+            await eliminarDocumentoDeDB(doc.id);
+          }
         }
+        await eliminarExpedienteFirestore(id);
+        setExpedientesLocal(expedientesLocal.filter(exp => exp.id !== id));
+      } catch (error) {
+        console.error('Error eliminando expediente:', error);
+        alert('Error al eliminar el expediente');
+      } finally {
+        setSincronizando(false);
       }
-      const nuevosExpedientes = expedientesLocal.filter(exp => exp.id !== id);
-      setExpedientesLocal(nuevosExpedientes);
-      await guardarDatos(nuevosExpedientes);
     }
   };
 
@@ -191,16 +226,20 @@ const Expedientes = () => {
           const docId = `${expId}_${Date.now()}_${archivo.name}`;
           await guardarDocumentoEnDB(docId, archivo.name, base64);
           
-          // Actualizar el expediente
+          // Actualizar el expediente en Firestore
+          const expedienteActual = expedientesLocal.find(exp => exp.id === expId);
+          const nuevosDocs = [...(expedienteActual.documentos || []), { id: docId, nombre: archivo.name }];
+          const expedienteActualizado = { ...expedienteActual, documentos: nuevosDocs };
+          
+          await actualizarExpediente(expId, expedienteActualizado);
+          
           const nuevosExpedientes = expedientesLocal.map(exp => {
             if (exp.id === expId) {
-              const nuevosDocs = [...(exp.documentos || []), { id: docId, nombre: archivo.name }];
               return { ...exp, documentos: nuevosDocs };
             }
             return exp;
           });
           setExpedientesLocal(nuevosExpedientes);
-          await guardarDatos(nuevosExpedientes);
         };
         reader.readAsDataURL(archivo);
       } catch (error) {
@@ -215,15 +254,20 @@ const Expedientes = () => {
   const eliminarDocumento = async (expId, docId) => {
     if (window.confirm('¿Eliminar este documento permanentemente?')) {
       await eliminarDocumentoDeDB(docId);
+      
+      const expedienteActual = expedientesLocal.find(exp => exp.id === expId);
+      const nuevosDocs = (expedienteActual.documentos || []).filter(doc => doc.id !== docId);
+      const expedienteActualizado = { ...expedienteActual, documentos: nuevosDocs };
+      
+      await actualizarExpediente(expId, expedienteActualizado);
+      
       const nuevosExpedientes = expedientesLocal.map(exp => {
         if (exp.id === expId) {
-          const nuevosDocs = (exp.documentos || []).filter(doc => doc.id !== docId);
           return { ...exp, documentos: nuevosDocs };
         }
         return exp;
       });
       setExpedientesLocal(nuevosExpedientes);
-      await guardarDatos(nuevosExpedientes);
     }
   };
 
@@ -261,21 +305,17 @@ const Expedientes = () => {
     return true;
   });
 
-  if (cargando) return <div className="text-center py-20">Cargando expedientes...</div>;
+  if (cargando) return <div className="text-center py-20">Cargando expedientes desde la nube...</div>;
 
   return (
     <div className="px-4">
-      {/* Portada con imagen LOCAL de expedientes */}
+      {/* Portada */}
       <div className="relative rounded-2xl overflow-hidden shadow-lg mb-6">
         <div className="absolute inset-0 bg-gradient-to-r from-slate-900 to-slate-700"></div>
         <img 
-          src="/expedientes.jpg"
+          src="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?q=80&w=2070&auto=format&fit=crop"
           alt="Gestión de expedientes judiciales"
           className="w-full h-32 object-cover opacity-40"
-          onError={(e) => {
-            e.target.onerror = null;
-            e.target.src = 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?q=80&w=2070&auto=format&fit=crop';
-          }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
         <div className="relative z-10 p-4 text-white">
@@ -283,13 +323,13 @@ const Expedientes = () => {
             <span className="material-symbols-outlined text-4xl text-amber-400">folder_open</span>
             <h1 className="text-2xl font-black">Gestor de Expedientes</h1>
           </div>
-          <p className="text-gray-200 text-sm">Administra todos los datos judiciales de tus casos, documentos y seguimiento.</p>
+          <p className="text-gray-200 text-sm">Administra todos tus casos. Los datos se guardan automáticamente en la nube.</p>
         </div>
       </div>
 
       {/* Botón nuevo expediente */}
       <div className="flex justify-end mb-6">
-        <button onClick={abrirModalNuevo} className="bg-amber-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-amber-600 transition flex items-center gap-2">
+        <button onClick={abrirModalNuevo} disabled={sincronizando} className="bg-amber-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-amber-600 transition flex items-center gap-2 shadow-md disabled:opacity-50">
           <span className="material-symbols-outlined text-sm">add</span>
           Nuevo expediente
         </button>
@@ -303,11 +343,11 @@ const Expedientes = () => {
             placeholder="Buscar por número, actor, asunto, secretaría..." 
             value={busqueda} 
             onChange={(e) => setBusqueda(e.target.value)} 
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg" 
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none" 
           />
         </div>
         <div>
-          <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg">
+          <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none">
             <option value="todos">Todos los estados</option>
             <option value="activo">Activo</option>
             <option value="en tramite">En trámite</option>
@@ -316,10 +356,18 @@ const Expedientes = () => {
         </div>
       </div>
 
+      {/* Indicador de sincronización */}
+      {sincronizando && (
+        <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50">
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+          <span className="text-sm">Sincronizando...</span>
+        </div>
+      )}
+
       {/* Listado de expedientes */}
       {expedientesFiltrados.length === 0 ? (
         <div className="bg-white p-8 rounded-xl text-center text-gray-500 border border-gray-200 shadow-sm">
-          No hay expedientes.
+          No hay expedientes. Haz clic en "Nuevo expediente" para comenzar.
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
@@ -357,8 +405,8 @@ const Expedientes = () => {
                           <div key={doc.id} className="flex items-center gap-1 bg-gray-100 rounded-full px-2 py-1">
                             <span className="material-symbols-outlined text-sm text-amber-600">description</span>
                             <span className="text-xs text-gray-700 truncate max-w-[150px]">{doc.nombre}</span>
-                            <button onClick={() => eliminarDocumento(exp.id, doc.id)} className="text-red-500 hover:text-red-700 text-xs">🗑️</button>
-                            <button onClick={() => descargarDocumento(doc.id, doc.nombre)} className="text-blue-500 hover:text-blue-700 text-xs">⬇️</button>
+                            <button onClick={() => eliminarDocumento(exp.id, doc.id)} className="text-red-500 hover:text-red-700 text-xs" title="Eliminar">🗑️</button>
+                            <button onClick={() => descargarDocumento(doc.id, doc.nombre)} className="text-blue-500 hover:text-blue-700 text-xs" title="Descargar">⬇️</button>
                           </div>
                         ))}
                       </div>
@@ -377,10 +425,10 @@ const Expedientes = () => {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => abrirModalEditar(exp)} className="text-blue-500 hover:text-blue-700">
+                  <button onClick={() => abrirModalEditar(exp)} className="text-blue-500 hover:text-blue-700 p-1" title="Editar">
                     <span className="material-symbols-outlined">edit</span>
                   </button>
-                  <button onClick={() => eliminarExpediente(exp.id)} className="text-red-500 hover:text-red-700">
+                  <button onClick={() => eliminarExpediente(exp.id)} className="text-red-500 hover:text-red-700 p-1" title="Eliminar">
                     <span className="material-symbols-outlined">delete</span>
                   </button>
                 </div>
@@ -412,7 +460,9 @@ const Expedientes = () => {
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={() => setModalAbierto(false)} className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50">Cancelar</button>
-              <button onClick={guardarExpediente} className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600">Guardar</button>
+              <button onClick={guardarExpediente} disabled={sincronizando} className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50">
+                {sincronizando ? 'Guardando...' : 'Guardar'}
+              </button>
             </div>
           </div>
         </div>

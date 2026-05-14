@@ -1,3 +1,4 @@
+// src/pages/PanelPrincipal.js
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,7 +13,7 @@ const PanelPrincipal = () => {
     { id: 5, nombre: 'Libros', ruta: '/libros', descripcion: 'Biblioteca digital especializada', imagen: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?q=80&w=2070&auto=format&fit=crop' },
     { id: 6, nombre: 'Legislación', ruta: '/legislacion', descripcion: 'Leyes, códigos y jurisprudencia', imagen: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?q=80&w=2070&auto=format&fit=crop' },
     { id: 7, nombre: 'Billetera Electrónica', ruta: '/mi-billetera', descripcion: 'Gestiona tus pagos y transacciones', imagen: 'https://images.unsplash.com/photo-1579621970795-87facc2f976d?q=80&w=2070&auto=format&fit=crop' },
-    { id: 8, nombre: 'Expedientes', ruta: '/expedientes', descripcion: 'Gestión de expedientes judiciales', imagen: '/expedientes.jpg' },
+    { id: 8, nombre: 'Expedientes', ruta: '/expedientes', descripcion: 'Gestión de expedientes judiciales', imagen: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?q=80&w=2070&auto=format&fit=crop' },
     { id: 9, nombre: 'Calculadora Laboral', ruta: '/calculadora-laboral', descripcion: 'Cálculos de liquidaciones y finiquitos', imagen: 'https://images.pexels.com/photos/53621/calculator-calculation-insurance-finance-53621.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2' },
     { id: 10, nombre: 'Cotizador Legal', ruta: '/cotizador-legal', descripcion: 'Cotización de honorarios y servicios', imagen: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?q=80&w=2070&auto=format&fit=crop' },
     { id: 11, nombre: 'Gestor Jurídico', ruta: '/gestor-juridico', descripcion: 'Gestión de documentos y procesos', imagen: 'https://images.pexels.com/photos/48148/document-agreement-documents-sign-48148.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2' },
@@ -51,7 +52,12 @@ const PanelPrincipal = () => {
         {paginas.map((pagina) => (
           <div key={pagina.id} onClick={() => navigate(pagina.ruta)} className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer group hover:-translate-y-1">
             <div className="h-36 relative overflow-hidden bg-gray-100">
-              <img src={pagina.imagen} alt={pagina.nombre} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+              <img src={pagina.imagen} alt={pagina.nombre} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?q=80&w=2070&auto=format&fit=crop';
+                }}
+              />
             </div>
             <div className="p-4">
               <h3 className="text-lg font-bold text-gray-800 mb-1 line-clamp-1">{pagina.nombre}</h3>

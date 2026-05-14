@@ -1,6 +1,8 @@
 // src/pages/AgendaLaboral.jsx
 import { useState, useEffect } from 'react';
 import { usePersistencia } from '../hooks/usePersistencia';
+import GoogleCalendarAuth from '../components/GoogleCalendarAuth';
+import { generarEnlaceGoogleCalendar } from '../services/googleCalendarService';
 
 // ------------------------------------------------------------
 // CONFIGURACIÓN DE CALENDARIOS JUDICIALES
@@ -129,7 +131,8 @@ const AgendaLaboral = () => {
     fecha: '',
     hora: '',
     descripcion: '',
-    expediente: ''
+    expediente: '',
+    ubicacion: ''
   });
 
   // Sincronizar eventos con Firestore
@@ -139,7 +142,7 @@ const AgendaLaboral = () => {
     } else if (!cargando && (!eventosPersonales || eventosPersonales.length === 0)) {
       const hoy = new Date().toISOString().split('T')[0];
       const ejemplos = [
-        { id: 1, titulo: 'Audiencia de conciliación', tipo: 'audiencia', materia: 'Laboral', fecha: hoy, hora: '10:00', descripcion: 'Juzgado laboral', expediente: '2025-001' }
+        { id: 1, titulo: 'Audiencia de conciliación', tipo: 'audiencia', materia: 'Laboral', fecha: hoy, hora: '10:00', descripcion: 'Juzgado laboral', expediente: '2025-001', ubicacion: 'Juzgado Primero Laboral' }
       ];
       setEventosLocal(ejemplos);
       guardarDatos(ejemplos);
@@ -174,6 +177,28 @@ const AgendaLaboral = () => {
 
   const getEventosPersonalesPorFecha = (fechaStr) => {
     return eventosLocal.filter(ev => ev.fecha === fechaStr);
+  };
+
+  // Sincronizar evento con Google Calendar
+  const sincronizarEventoGoogle = (evento) => {
+    const url = generarEnlaceGoogleCalendar(evento);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  // Sincronizar todos los eventos
+  const sincronizarTodosEventos = () => {
+    if (eventosLocal.length === 0) {
+      alert('No hay eventos para sincronizar');
+      return;
+    }
+    
+    eventosLocal.forEach(evento => {
+      sincronizarEventoGoogle(evento);
+    });
+    
+    setTimeout(() => {
+      alert('✅ Se abrirán las pestañas de Google Calendar para cada evento');
+    }, 500);
   };
 
   // Navegación
@@ -296,7 +321,8 @@ const AgendaLaboral = () => {
       fecha: fecha || fechaSeleccionada,
       hora: '',
       descripcion: '',
-      expediente: ''
+      expediente: '',
+      ubicacion: ''
     });
     setModalAbierto(true);
   };
@@ -310,7 +336,8 @@ const AgendaLaboral = () => {
       fecha: evento.fecha,
       hora: evento.hora || '',
       descripcion: evento.descripcion || '',
-      expediente: evento.expediente || ''
+      expediente: evento.expediente || '',
+      ubicacion: evento.ubicacion || ''
     });
     setModalAbierto(true);
   };
@@ -459,6 +486,9 @@ const AgendaLaboral = () => {
                       <span className="font-bold text-sm">{ev.titulo}</span>
                     </div>
                     <div className="flex gap-1">
+                      <button onClick={() => sincronizarEventoGoogle(ev)} className="text-blue-500 text-xs" title="Agregar a Google Calendar">
+                        <span className="material-symbols-outlined text-sm">calendar_month</span>
+                      </button>
                       <button onClick={() => { setFechaSeleccionada(ev.fechaStr); setVista('dia'); }} className="text-blue-500 text-xs" title="Ver día">📅</button>
                       <button onClick={() => abrirModalEditar(ev)} className="text-blue-500"><span className="material-symbols-outlined text-sm">edit</span></button>
                       <button onClick={() => eliminarEvento(ev.id)} className="text-red-500"><span className="material-symbols-outlined text-sm">delete</span></button>
@@ -482,6 +512,9 @@ const AgendaLaboral = () => {
   const renderVistaDia = () => {
     const eventos = getEventosPersonalesPorFecha(fechaSeleccionada);
     const colorFondo = getColorDia(fechaSeleccionada);
+    const fechaObj = new Date(fechaSeleccionada);
+    const fechaFormateada = fechaObj.toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    
     return (
       <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
         <div className="bg-green-700 text-white text-center font-bold py-3 text-lg flex justify-between items-center px-4">
@@ -510,6 +543,9 @@ const AgendaLaboral = () => {
                       <span className="font-bold text-sm">{ev.titulo}</span>
                     </div>
                     <div className="flex gap-1">
+                      <button onClick={() => sincronizarEventoGoogle(ev)} className="text-blue-500 text-xs" title="Agregar a Google Calendar">
+                        <span className="material-symbols-outlined text-sm">calendar_month</span>
+                      </button>
                       <button onClick={() => abrirModalEditar(ev)} className="text-blue-500"><span className="material-symbols-outlined text-sm">edit</span></button>
                       <button onClick={() => eliminarEvento(ev.id)} className="text-red-500"><span className="material-symbols-outlined text-sm">delete</span></button>
                     </div>
@@ -518,6 +554,7 @@ const AgendaLaboral = () => {
                     {ev.hora && <span>🕒 {ev.hora}</span>}
                     {ev.materia && <span className="ml-2">⚖️ Materia: {ev.materia}</span>}
                     {ev.expediente && <span className="ml-2">📁 {ev.expediente}</span>}
+                    {ev.ubicacion && <span className="ml-2">📍 {ev.ubicacion}</span>}
                   </div>
                   {ev.descripcion && <p className="text-xs text-gray-500 mt-1">{ev.descripcion}</p>}
                 </div>
@@ -533,8 +570,6 @@ const AgendaLaboral = () => {
       </div>
     );
   };
-
-  const fechaFormateada = new Date(fechaSeleccionada).toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   if (cargando) return <div className="text-center py-20">Cargando agenda...</div>;
 
@@ -578,10 +613,13 @@ const AgendaLaboral = () => {
           <button onClick={() => cambiarVista('semana')} className={`px-3 py-1 rounded-md text-sm ${vista === 'semana' ? 'bg-amber-500 text-white' : 'bg-gray-200'}`}>Semana</button>
           <button onClick={() => cambiarVista('dia')} className={`px-3 py-1 rounded-md text-sm ${vista === 'dia' ? 'bg-amber-500 text-white' : 'bg-gray-200'}`}>Día</button>
         </div>
-        <button onClick={() => abrirModalNuevo()} className="bg-amber-500 text-white px-3 py-1 rounded-lg flex items-center gap-1 text-sm">
-          <span className="material-symbols-outlined text-sm">add</span>
-          Nuevo evento
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => abrirModalNuevo()} className="bg-amber-500 text-white px-3 py-1 rounded-lg flex items-center gap-1 text-sm">
+            <span className="material-symbols-outlined text-sm">add</span>
+            Nuevo evento
+          </button>
+          <GoogleCalendarAuth eventos={eventosLocal} onSync={sincronizarTodosEventos} />
+        </div>
       </div>
 
       {/* Leyenda compacta */}
@@ -593,6 +631,7 @@ const AgendaLaboral = () => {
         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-purple-500"></div> Susp. masculino</div>
         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-green-500"></div> Susp. 13:00</div>
         <div className="flex items-center gap-1"><span className="material-symbols-outlined text-amber-600 text-base">event</span> Evento personal</div>
+        <div className="flex items-center gap-1"><span className="material-symbols-outlined text-blue-500 text-base">calendar_month</span> Google Calendar</div>
       </div>
 
       {/* Contenido dinámico */}
@@ -605,7 +644,7 @@ const AgendaLaboral = () => {
       {/* Modal de creación/edición */}
       {modalAbierto && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">{editandoEvento ? 'Editar evento' : 'Nuevo evento personal'}</h2>
             <div className="space-y-4">
               <div>
@@ -638,6 +677,10 @@ const AgendaLaboral = () => {
                 <input type="time" value={formData.hora} onChange={e => setFormData({...formData, hora: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
               </div>
               <div>
+                <label className="block text-sm font-bold">Ubicación</label>
+                <input type="text" value={formData.ubicacion} onChange={e => setFormData({...formData, ubicacion: e.target.value})} className="w-full px-3 py-2 border rounded-lg" placeholder="Juzgado, Tribunal, Oficina..." />
+              </div>
+              <div>
                 <label className="block text-sm font-bold">Expediente vinculado</label>
                 <input type="text" value={formData.expediente} onChange={e => setFormData({...formData, expediente: e.target.value})} className="w-full px-3 py-2 border rounded-lg" placeholder="Número de expediente" />
               </div>
@@ -645,6 +688,17 @@ const AgendaLaboral = () => {
                 <label className="block text-sm font-bold">Descripción</label>
                 <textarea rows="2" value={formData.descripcion} onChange={e => setFormData({...formData, descripcion: e.target.value})} className="w-full px-3 py-2 border rounded-lg"></textarea>
               </div>
+              {editandoEvento && (
+                <div className="pt-2">
+                  <button
+                    onClick={() => sincronizarEventoGoogle(formData)}
+                    className="text-blue-500 hover:text-blue-700 text-sm flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-sm">calendar_month</span>
+                    Agregar a Google Calendar
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={() => setModalAbierto(false)} className="px-4 py-2 border rounded-lg">Cancelar</button>
